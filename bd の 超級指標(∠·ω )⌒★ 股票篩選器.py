@@ -10,8 +10,8 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="4H SMC 狙擊雷達", page_icon="🎯", layout="wide")
-st.title("🎯 4H 全市場 SMC 狙擊雷達")
+st.set_page_config(page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器")
 st.markdown("精準捕捉 **OB 訂單塊回踩** 與 **WaveTrend 恐慌轉折**。支援美股、台股與加密貨幣。")
 
 # ─── 記憶功能：讀取與儲存收藏名單 ───
