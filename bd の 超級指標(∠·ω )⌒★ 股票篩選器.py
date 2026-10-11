@@ -10,8 +10,8 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器")
+st.set_page_config(page_title="4H SMC 狙擊雷達", page_icon="🎯", layout="wide")
+st.title("🎯 4H 全市場 SMC 狙擊雷達")
 st.markdown("精準捕捉 **OB 訂單塊回踩** 與 **WaveTrend 恐慌轉折**。支援美股、台股與加密貨幣。")
 
 # ─── 記憶功能：讀取與儲存收藏名單 ───
@@ -167,8 +167,8 @@ def scan_4h_signals(df, recent_k):
 
         # ─── 訊號產生與時間/點位標記 ───
         curr_sigs = []
-        t_str = df.index[i].strftime('%m/%d %H:%M') # 取得 K 棒時間
-        c_p = f"{close.iloc[i]:.2f}"                # 取得當下收盤價
+        t_str = df.index[i].strftime('%m/%d %H:%M') 
+        c_p = f"{close.iloc[i]:.2f}"                
 
         if (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1]) and (wt1.iloc[i-1] <= -60.0) and wvf_ext.iloc[i-1] and rsi_red_below.iloc[i-1]: 
             curr_sigs.append(f"🟢【恐慌抄底】({t_str} @ {c_p})")
@@ -210,7 +210,8 @@ def format_vol(val):
     if val == 0 or pd.isna(val): return "N/A"
     if val >= 1e9: return f"{val/1e9:.2f} B"
     if val >= 1e6: return f"{val/1e6:.2f} M"
-    return str(val)
+    if val >= 1e3: return f"{val/1e3:.2f} K"
+    return f"{val:.0f}"
 
 # ─── 網頁側邊欄設定 ───
 st.sidebar.header("⚙️ 雷達掃描設定")
@@ -279,26 +280,34 @@ if scan_btn:
                     df_t = df_t.dropna(subset=['Close'])
                     if len(df_t) > 40:
                         df_t.name = t
+                        
+                        # --- 核心修改：直接從已下載的歷史 K 線計算平均每日交易量 ---
+                        try:
+                            # 依日期分組加總成交量，再取平均，這是 100% 穩定的做法
+                            avg_vol = df_t.groupby(df_t.index.date)['Volume'].sum().mean()
+                        except:
+                            avg_vol = 0
+                            
                         res = scan_4h_signals(resample_to_tv_4h(df_t), recent_k)
                         if res:
                             res["標的代號"] = t
+                            res["Raw_Volume"] = avg_vol
                             triggered_results.append(res)
                 except: continue
         except: continue
 
         progress_bar.progress(min((i + chunk_size) / len(all_tickers), 1.0))
 
-    status_text.text("🔍 掃描完畢！正在抓取交易量與排版...")
+    status_text.text("🔍 掃描完畢！正在排版與分析結果...")
 
     if triggered_results:
         for res in triggered_results:
             ticker = res['標的代號']
-            try:
-                info = yf.Ticker(ticker).info
-                res['Raw_Volume'] = info.get('averageVolume', info.get('volume', 0))
-            except: res['Raw_Volume'] = 0
-
-            res['日均交易量'] = format_vol(res['Raw_Volume'])
+            
+            # --- 直接讀取算好的 Raw_Volume，不再呼叫容易壞的 yf.Ticker(t).info ---
+            raw_vol = res.get('Raw_Volume', 0)
+            res['日均交易量'] = format_vol(raw_vol)
+            
             res['Priority'] = 1 if ticker in favorites else 0
             if ticker in favorites: res['標的代號'] = f"⭐ {ticker}"
 
