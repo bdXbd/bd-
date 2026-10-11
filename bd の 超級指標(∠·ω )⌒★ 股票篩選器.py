@@ -11,8 +11,8 @@ warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
 # 這裡加上了 V4.2 版本號，用來確認有沒有更新成功
-st.set_page_config(page_title="SMC 狙擊雷達 V4.2", page_icon="🎯", layout="wide")
-st.title("🎯 4H 全市場 SMC 狙擊雷達 V4.2")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.2", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.2")
 st.markdown("精準捕捉 **OB 訂單塊回踩** 與 **WaveTrend 恐慌轉折**。支援美股、台股與加密貨幣。")
 
 # ─── 記憶功能：讀取與儲存收藏名單 ───
