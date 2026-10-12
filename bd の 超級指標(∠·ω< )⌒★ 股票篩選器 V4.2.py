@@ -6,48 +6,32 @@ import requests
 import time
 import warnings
 import os
-import json  
 
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.7", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.7")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並支援 **PEG 基本面篩選**與**無效標的偵測**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.8", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.8")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並支援 **防呆版基本面掃描**。")
 
-# ─── 記憶功能 (支援多分類資料夾) ───
-FAV_FILE = "favorites.json"
-OLD_FAV_FILE = "favorites.txt"
-
-DEFAULT_FAVS = {
-    "預設清單": ["SPY", "QQQ", "NVDA", "TSLA", "2330.TW", "0050.TW", "BZ=F", "^TWII", "STW=F", "NQ=F"],
-    "美股七巨頭": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA"],
-    "加密貨幣": ["BTC-USD", "ETH-USD", "SOL-USD", "DOGE-USD"]
-}
+# ─── 記憶功能 (回歸極簡純收藏) ───
+FAV_FILE = "favorites.txt"
+# 預設清單已幫你把 STW=F 換成有夜盤且資料完整的 EWT
+DEFAULT_FAVS = "SPY, QQQ, NVDA, TSLA, 2330.TW, 0050.TW, BZ=F, ^TWII, EWT, NQ=F, BTC-USD"
 
 def load_favorites():
     if os.path.exists(FAV_FILE):
         try:
             with open(FAV_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except: pass
-        
-    if os.path.exists(OLD_FAV_FILE):
-        try:
-            with open(OLD_FAV_FILE, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-                if content:
-                    migrated = DEFAULT_FAVS.copy()
-                    migrated["舊版自訂清單"] = [t.strip().upper() for t in content.split(",") if t.strip()]
-                    save_favorites(migrated)
-                    return migrated
+                # 簡單過濾掉可能殘留的 JSON 格式 (防呆)
+                if content and not content.startswith("{"): return content
         except: pass
-        
-    return DEFAULT_FAVS.copy()
+    return DEFAULT_FAVS
 
-def save_favorites(fav_dict):
+def save_favorites(fav_str):
     with open(FAV_FILE, "w", encoding="utf-8") as f:
-        json.dump(fav_dict, f, ensure_ascii=False, indent=4)
+        f.write(fav_str)
 
 # ─── 核心運算函數 ───
 @st.cache_data(ttl=3600)
@@ -236,58 +220,37 @@ def format_vol(val):
 # ─── 網頁側邊欄設定 ───
 st.sidebar.header("⚙️ 雷達掃描設定")
 
-fav_dict = load_favorites()
-category_names = list(fav_dict.keys())
-
-st.sidebar.subheader("📂 收藏標的 (自訂分類)")
-selected_cat = st.sidebar.selectbox("選擇分類資料夾", category_names)
-
-current_tickers_str = ", ".join(fav_dict[selected_cat])
+st.sidebar.subheader("📌 收藏標的清單")
 fav_input = st.sidebar.text_area(
-    f"編輯「{selected_cat}」內的標的：",
-    value=current_tickers_str,
-    help="用半形逗號分隔，台股請加 .TW (如 2330.TW)。"
+    "請輸入股票代號 (用半形逗號分隔)：",
+    value=load_favorites(),
+    height=150,
+    help="台股請加 .TW (如 2330.TW)。大盤 ^TWII，台期貨替身 EWT。"
 )
 
-col1, col2 = st.sidebar.columns(2)
-if col1.button("💾 儲存修改"):
-    fav_dict[selected_cat] = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
-    save_favorites(fav_dict)
-    st.sidebar.success("已儲存！")
+if st.sidebar.button("💾 儲存清單"):
+    save_favorites(fav_input)
+    st.sidebar.success("清單已儲存！")
     time.sleep(0.5)
     st.rerun()
 
-if col2.button("🗑️ 刪除分類"):
-    if len(category_names) > 1:
-        del fav_dict[selected_cat]
-        save_favorites(fav_dict)
-        st.sidebar.success("已刪除！")
-        time.sleep(0.5)
-        st.rerun()
-    else:
-        st.sidebar.error("至少需保留一個分類！")
-
-with st.sidebar.expander("➕ 新增分類資料夾"):
-    new_cat_name = st.text_input("輸入新分類名稱：", placeholder="例如：記憶體模組")
-    if st.button("建立分類"):
-        if new_cat_name and new_cat_name not in fav_dict:
-            fav_dict[new_cat_name] = []
-            save_favorites(fav_dict)
-            st.success(f"已建立「{new_cat_name}」！")
-            time.sleep(0.5)
-            st.rerun()
-        elif new_cat_name in fav_dict:
-            st.error("此名稱已存在！")
-
 st.sidebar.divider()
 
-with st.sidebar.expander("📊 基本面過濾 (市賺率、本益比)"):
-    st.markdown("⚠️ *注意：開啟後會額外下載財報，掃描大範圍股票時速度較慢*")
-    use_fund_filter = st.checkbox("啟用基本面篩選", value=False)
+# 新版：合併為單一防呆選擇器
+with st.sidebar.expander("📊 掃描模式與基本面過濾", expanded=True):
+    scan_mode = st.radio(
+        "選擇掃描模式：",
+        [
+            "1. 僅看技術指標 (預設)", 
+            "2. 聯集 (技術觸發 OR 基本面達標)", 
+            "3. 交集 (技術觸發 AND 基本面達標)", 
+            "4. 僅看基本面 (無視技術指標)"
+        ]
+    )
     
-    fund_logic = st.radio("技術與基本面邏輯", ["聯集 (符合技術訊號 OR 基本面達標)", "交集 (必須同時符合才顯示)", "僅看基本面 (無視技術訊號)"])
-    
-    max_peg = st.number_input("市賺率 (PEG) 低於", min_value=0.0, value=1.0, step=0.1, help="設 0 為不限制 (通常小於1視為股價被低估)")
+    st.markdown("---")
+    st.markdown("*(若選模式 2~4，系統將額外下載財報進行以下過濾)*")
+    max_peg = st.number_input("市賺率 (PEG) 低於", min_value=0.0, value=1.0, step=0.1, help="設 0 為不限制")
     max_pe = st.number_input("本益比 (P/E) 低於", min_value=0.0, value=0.0, step=1.0, help="設 0 為不限制")
     max_pb = st.number_input("股價淨值比 (P/B) 低於", min_value=0.0, value=0.0, step=0.1, help="設 0 為不限制")
 
@@ -316,7 +279,7 @@ all_sig_types = [
 ]
 target_signals = st.sidebar.multiselect("保留含有以下訊號的標的 (若清空則顯示全部)", all_sig_types, default=all_sig_types)
 
-scan_btn = st.sidebar.button(f"🚀 立即掃描「{selected_cat}」", use_container_width=True)
+scan_btn = st.sidebar.button("🚀 立即啟動掃描", use_container_width=True)
 
 # ─── 主程式掃描執行 ───
 if scan_btn:
@@ -335,7 +298,7 @@ if scan_btn:
     all_tickers = list(dict.fromkeys(all_tickers)) 
     
     if not all_tickers:
-        st.error("❌ 目前資料夾是空的，請先新增標的！")
+        st.error("❌ 收藏清單是空的！")
         st.stop()
 
     st.info(f"🚀 即將掃描共 {len(all_tickers)} 檔標的...")
@@ -344,12 +307,13 @@ if scan_btn:
 
     chunk_size = 80
     triggered_results = []
-    
-    # 新增：用來記錄成功抓到完整數據的標的
     successful_tickers = set()
     start_time = time.time()
     
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+    
+    # 決定是否需要抓取基本面
+    use_fund = not scan_mode.startswith("1")
 
     for i in range(0, len(all_tickers), chunk_size):
         batch = all_tickers[i:i+chunk_size]
@@ -362,9 +326,8 @@ if scan_btn:
                     df_t = data[t] if len(batch) > 1 else data
                     df_t = df_t.dropna(subset=['Close'])
                     
-                    # 檢查 K 線數量是否足夠算指標 (至少需要 40 根)
                     if len(df_t) > 40:
-                        successful_tickers.add(t) # 標記此標的為「資料有效」
+                        successful_tickers.add(t)
                         df_t.name = t
                         
                         try:
@@ -387,7 +350,7 @@ if scan_btn:
                         pass_fund = False
                         pe_val, peg_val, pb_val = 0, 0, 0
                         
-                        if use_fund_filter:
+                        if use_fund:
                             try:
                                 info = yf.Ticker(t).info
                                 pe_val = info.get('trailingPE') or 0
@@ -405,24 +368,25 @@ if scan_btn:
                             except:
                                 pass_fund = False 
 
+                        # 根據防呆單選按鈕判斷邏輯
                         should_add = False
-                        if use_fund_filter:
-                            if "聯集" in fund_logic:
-                                should_add = pass_tech or pass_fund
-                            elif "交集" in fund_logic:
-                                should_add = pass_tech and pass_fund
-                            else:
-                                should_add = pass_fund
-                        else:
+                        if scan_mode.startswith("1"):
                             should_add = pass_tech
+                        elif scan_mode.startswith("2"):
+                            should_add = pass_tech or pass_fund
+                        elif scan_mode.startswith("3"):
+                            should_add = pass_tech and pass_fund
+                        elif scan_mode.startswith("4"):
+                            should_add = pass_fund
                             
                         if should_add:
                             final_res = res_tech if res_tech else {}
                             final_res["標的代號"] = t
                             final_res["Raw_Volume"] = avg_vol
-                            final_res["觸發指標通知"] = res_tech["觸發指標通知"] if res_tech else "無技術訊號"
+                            # 若技術面沒觸發但基本面過關，顯示無技術訊號
+                            final_res["觸發指標通知"] = res_tech["觸發指標通知"] if pass_tech else "無技術訊號"
                             
-                            if use_fund_filter:
+                            if use_fund:
                                 final_res["PEG (市賺率)"] = f"{peg_val:.2f}" if peg_val > 0 else "N/A"
                                 final_res["P/E"] = f"{pe_val:.2f}" if pe_val > 0 else "N/A"
                                 final_res["P/B"] = f"{pb_val:.2f}" if pb_val > 0 else "N/A"
@@ -435,7 +399,6 @@ if scan_btn:
 
     status_text.text("🔍 掃描完畢！正在過濾分析結果...")
 
-    # 新增：檢查並顯示無效標的警告
     failed_tickers = [t for t in all_tickers if t not in successful_tickers]
     if failed_tickers:
         st.warning(f"⚠️ 以下標的無法取得足夠數據 (可能代號錯誤、近期無交易紀錄，或該時間框架無資料)：\n\n **{', '.join(failed_tickers)}**")
@@ -470,13 +433,13 @@ if scan_btn:
             df_report = df_report.sort_values(by=['Priority', 'Raw_Volume'], ascending=[False, False])
             
             cols_to_show = ["標的代號", "日均交易量"]
-            if use_fund_filter:
+            if use_fund:
                 cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
             cols_to_show.append("觸發指標通知")
 
-            st.success(f"🎯 掃描完成！共發現 {len(df_report)} 檔符合過濾條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
+            st.success(f"🎯 掃描完成！共發現 {len(df_report)} 檔符合條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
             st.dataframe(df_report[cols_to_show], use_container_width=True, height=600)
         else:
             st.warning(f"🎯 雖然有標的觸發訊號，但全都被「指標過濾器」濾掉了！可以試著把過濾條件放寬一點。")
     else:
-        st.warning(f"🎯 目前有效掃描清單內，未發現任何符合條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
+        st.warning(f"🎯 目前掃描清單內，未發現任何符合條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
