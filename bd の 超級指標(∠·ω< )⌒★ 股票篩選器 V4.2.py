@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.8", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.8")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板 (訊號防連發鎖定版)**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.9", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.9")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **SMC (BOS/CHOCH) 結構破位偵測**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -123,6 +123,9 @@ def scan_signals(df, recent_k):
     last_wt_ph_idx = -1
     last_wt_ph_val = -float('inf')
     last_wt_ph_price = -float('inf')
+    
+    # SMC 內部結構趨勢追蹤 (0:震盪, 1:多頭, -1:空頭)
+    internal_trend = 0
 
     for i in range(2, n):
         if low.iloc[i] < rt_lower.iloc[i]: rt_blw_cnt += 1
@@ -130,7 +133,6 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
-        # 當跌入紅區時，解鎖 Market Bottom 觸發器
         if per_under.iloc[i] < 100.0: 
             mb_fired_in_cycle = False
             
@@ -150,7 +152,14 @@ def scan_signals(df, recent_k):
             if min([low.iloc[j] for j in range(i - size*2, i + 1)]) == low.iloc[i - size]:
                 last_pl, pl_idx = low.iloc[i - size], i - size
 
+            # ── 偵測 SMC 多頭破位 (突破波段高點) ──
             if close.iloc[i] > last_ph and ph_idx != -1:
+                is_choch = (internal_trend == -1)
+                internal_trend = 1
+                if i >= n - recent_k:
+                    tag = "CHOCH" if is_choch else "BOS"
+                    curr_sigs.append(f"🟢【多頭 {tag}】({t_str} 破 {last_ph:.2f})")
+                
                 start_idx = max(0, pl_idx)
                 ob_idx, min_l = start_idx, low.iloc[start_idx]
                 for j in range(start_idx, i + 1):
@@ -158,7 +167,14 @@ def scan_signals(df, recent_k):
                 bull_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_ph = float('inf')
 
+            # ── 偵測 SMC 空頭破位 (跌破波段低點) ──
             if close.iloc[i] < last_pl and pl_idx != -1:
+                is_choch = (internal_trend == 1)
+                internal_trend = -1
+                if i >= n - recent_k:
+                    tag = "CHOCH" if is_choch else "BOS"
+                    curr_sigs.append(f"🔴【空頭 {tag}】({t_str} 破 {last_pl:.2f})")
+                
                 start_idx = max(0, ph_idx)
                 ob_idx, max_h = start_idx, high.iloc[start_idx]
                 for j in range(start_idx, i + 1):
@@ -166,6 +182,7 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
+            # WT純背離計算
             wt_slice = wt1.iloc[i - size*2 : i + 1].values
             left_max = np.max(wt_slice[:size])
             right_max = np.max(wt_slice[size+1:])
@@ -193,7 +210,6 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
             os_ext_trig = True
             
-        # ── V5.8: Market Bottom 防連發鎖定機制 ──
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
         red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
         had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
@@ -304,6 +320,7 @@ scan_days = st.sidebar.slider("載入歷史天數", min_value=10, max_value=max_
 
 st.sidebar.subheader("🔍 指標過濾器")
 all_sig_types = [
+    "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
     "🟢【恐慌抄底】", "🟣【極度超賣】", "🟡【Market Bottom】",
     "🟪【超賣預警】", "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
     "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐回踩】", "🟥【OB壓力測試】",
@@ -337,7 +354,7 @@ if scan_btn:
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
-    # ─── 大盤風向球預警系統 (明確警告旗下個股操作) ───
+    # ─── 大盤風向球預警系統 ───
     st.markdown("---")
     st.subheader("🚥 大盤環境與板塊操作建議 (回看 14 根 K 線)")
     
@@ -353,11 +370,13 @@ if scan_btn:
     
     bull_kws_map = {
         "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
-        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力"
+        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力",
+        "多頭 CHOCH": "多頭 CHOCH", "多頭 BOS": "多頭 BOS"
     }
     bear_kws_map = {
         "頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警",
-        "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐"
+        "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐",
+        "空頭 CHOCH": "空頭 CHOCH", "空頭 BOS": "空頭 BOS"
     }
     
     with st.spinner("🔄 正在分析大盤宏觀風向..."):
