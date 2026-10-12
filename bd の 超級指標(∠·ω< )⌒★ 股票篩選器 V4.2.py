@@ -6,30 +6,64 @@ import requests
 import time
 import warnings
 import os
+import json
 
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.2", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.2")
-st.markdown("精準捕捉 **OB 訂單塊有效反彈**、**WT 恐慌轉折**，並搭載 **SMC 結構 × 動能的 12 象限大盤解析**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.3", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.3")
+st.markdown("精準捕捉 **OB 訂單塊有效反彈**、**WT 恐慌轉折**，並搭載 **12 象限大盤解析與全域記憶功能**。")
 
-# ─── 記憶功能 (回歸極簡純收藏) ───
-FAV_FILE = "favorites.txt"
-DEFAULT_FAVS = "SPY, QQQ, NVDA, TSLA, 2330.TW, 0050.TW, BZ=F, ^TWII, EWT, NQ=F, BTC-USD"
+# ─── 記憶功能升級 (全域設定檔) ───
+CONFIG_FILE = "scanner_config.json"
+FAV_FILE = "favorites.txt"  # 保留相容性讀取舊版清單
 
-def load_favorites():
+ALL_SIG_TYPES = [
+    "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
+    "🟢【恐慌抄底】", "🟣【極度超賣】", "🟡【Market Bottom】",
+    "🟪【超賣預警】", "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
+    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐確認】", "🟥【OB壓力確認】",
+    "🚀【突破OB壓力】", "⚠️【跌破OB支撐】"
+]
+
+def load_config():
+    # 預設設定
+    config = {
+        "favorites": "SPY, QQQ, NVDA, TSLA, 2330.TW, 0050.TW, BZ=F, ^TWII, EWT, NQ=F, BTC-USD",
+        "scan_mode": "1. 僅看技術指標 (預設)",
+        "max_peg": 1.0,
+        "max_pe": 0.0,
+        "max_pb": 0.0,
+        "scan_us_indices": False,
+        "selected_tf_label": "4小時K (TV標準)",
+        "recent_k": 2,
+        "scan_days": 60,
+        "target_signals": ALL_SIG_TYPES
+    }
+    
+    # 向下相容：如果舊版 favorites.txt 存在，優先讀取裡面的股票
     if os.path.exists(FAV_FILE):
         try:
             with open(FAV_FILE, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-                if content and not content.startswith("{"): return content
+                if content and not content.startswith("{"): 
+                    config["favorites"] = content
         except: pass
-    return DEFAULT_FAVS
 
-def save_favorites(fav_str):
-    with open(FAV_FILE, "w", encoding="utf-8") as f:
-        f.write(fav_str)
+    # 讀取 JSON 設定檔
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved_config = json.load(f)
+                config.update(saved_config)
+        except: pass
+        
+    return config
+
+def save_config(config_dict):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config_dict, f, ensure_ascii=False, indent=4)
 
 # ─── 核心運算函數 ───
 @st.cache_data(ttl=3600)
@@ -124,7 +158,6 @@ def scan_signals(df, recent_k):
     last_wt_ph_val = -float('inf')
     last_wt_ph_price = -float('inf')
     
-    # SMC 結構追蹤
     internal_trend = 0
     last_smc_tag = "BOS"
 
@@ -181,7 +214,6 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
-            # 純 WT 頂背離判斷
             wt_slice = wt1.iloc[i - size*2 : i + 1].values
             left_max = np.max(wt_slice[:size])
             right_max = np.max(wt_slice[size+1:])
@@ -239,25 +271,18 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})")
             rt_last_sig = i
 
-        # ── V6.2 OB 支撐壓力確認邏輯 (單K留影線 + 多K吞噬站回) ──
         if i >= n - recent_k:
             for ob in bull_obs:
-                # 1. 單K測試: 最低價戳進 OB，但收盤成功守在 OB 頂部之上 (長下影線)
                 bounce_1k = (low.iloc[i] <= ob['top']) and (close.iloc[i] > ob['top'])
-                # 2. 多K確認: 上一根收盤跌進 OB，這根實體強勢站回 OB 頂部之上 (吞噬/站回)
                 bounce_2k = (close.iloc[i-1] <= ob['top']) and (close.iloc[i] > ob['top'])
-                
                 if bounce_1k or bounce_2k:
                     curr_sigs.append(f"🟩【OB支撐確認】({t_str} 守穩 {ob['top']:.2f})")
                 elif close.iloc[i-1] >= ob['bot'] and close.iloc[i] < ob['bot']:
                     curr_sigs.append(f"⚠️【跌破OB支撐】({t_str} 破 {ob['bot']:.2f})")
             
             for ob in bear_obs:
-                # 1. 單K測試: 最高價戳進 OB，但收盤被壓在 OB 底部之下 (長上影線)
                 reject_1k = (high.iloc[i] >= ob['bot']) and (close.iloc[i] < ob['bot'])
-                # 2. 多K確認: 上一根收盤進入 OB，這根實體跌破 OB 底部之下 (吞噬/回落)
                 reject_2k = (close.iloc[i-1] >= ob['bot']) and (close.iloc[i] < ob['bot'])
-                
                 if reject_1k or reject_2k:
                     curr_sigs.append(f"🟥【OB壓力確認】({t_str} 受阻 {ob['bot']:.2f})")
                 elif close.iloc[i-1] <= ob['top'] and close.iloc[i] > ob['top']:
@@ -280,66 +305,77 @@ def format_vol(val):
     if val >= 1e3: return f"{val/1e3:.2f} K"
     return f"{val:.0f}"
 
-# ─── 網頁側邊欄設定 ───
+# ─── 網頁側邊欄設定 (載入記憶) ───
+user_config = load_config()
+
 st.sidebar.header("⚙️ 雷達掃描設定")
 
 st.sidebar.subheader("📌 收藏標的清單")
 fav_input = st.sidebar.text_area(
     "請輸入股票代號 (用半形逗號分隔)：",
-    value=load_favorites(),
+    value=user_config["favorites"],
     height=150,
     help="台股請加 .TW (如 2330.TW)。大盤 ^TWII，台期貨替身 EWT。"
 )
 
-if st.sidebar.button("💾 儲存清單"):
-    save_favorites(fav_input)
-    st.sidebar.success("清單已儲存！")
-    time.sleep(0.5)
-    st.rerun()
-
 st.sidebar.divider()
 
 with st.sidebar.expander("📊 掃描模式與基本面過濾", expanded=True):
-    scan_mode = st.radio(
-        "選擇掃描模式：",
-        [
-            "1. 僅看技術指標 (預設)", 
-            "2. 聯集 (技術觸發 OR 基本面達標)", 
-            "3. 交集 (技術觸發 AND 基本面達標)", 
-            "4. 僅看基本面 (無視技術指標)"
-        ]
-    )
+    scan_options = [
+        "1. 僅看技術指標 (預設)", 
+        "2. 聯集 (技術觸發 OR 基本面達標)", 
+        "3. 交集 (技術觸發 AND 基本面達標)", 
+        "4. 僅看基本面 (無視技術指標)"
+    ]
+    s_idx = scan_options.index(user_config["scan_mode"]) if user_config["scan_mode"] in scan_options else 0
+    scan_mode = st.radio("選擇掃描模式：", scan_options, index=s_idx)
     
     st.markdown("---")
-    max_peg = st.number_input("市賺率 (PEG) 低於", min_value=0.0, value=1.0, step=0.1, help="設 0 為不限制")
-    max_pe = st.number_input("本益比 (P/E) 低於", min_value=0.0, value=0.0, step=1.0, help="設 0 為不限制")
-    max_pb = st.number_input("股價淨值比 (P/B) 低於", min_value=0.0, value=0.0, step=0.1, help="設 0 為不限制")
+    max_peg = st.number_input("市賺率 (PEG) 低於", min_value=0.0, value=float(user_config["max_peg"]), step=0.1, help="設 0 為不限制")
+    max_pe = st.number_input("本益比 (P/E) 低於", min_value=0.0, value=float(user_config["max_pe"]), step=1.0, help="設 0 為不限制")
+    max_pb = st.number_input("股價淨值比 (P/B) 低於", min_value=0.0, value=float(user_config["max_pb"]), step=0.1, help="設 0 為不限制")
 
 st.sidebar.divider()
 
 st.sidebar.subheader("🌍 全市場掃描擴充")
-scan_us_indices = st.sidebar.checkbox("同步掃描美股三大指數 (SPY,QQQ,SOXX)", value=False)
+scan_us_indices = st.sidebar.checkbox("同步掃描美股三大指數 (SPY,QQQ,SOXX)", value=bool(user_config["scan_us_indices"]))
 
 st.sidebar.subheader("🎯 訊號與時間參數")
 tf_options = {"15分K": "15m", "1小時K": "1h", "4小時K (TV標準)": "4h", "日K": "1d"}
-selected_tf_label = st.sidebar.selectbox("⏳ 選擇時間框架", list(tf_options.keys()), index=2)
+tf_opts_keys = list(tf_options.keys())
+tf_idx = tf_opts_keys.index(user_config["selected_tf_label"]) if user_config["selected_tf_label"] in tf_opts_keys else 2
+selected_tf_label = st.sidebar.selectbox("⏳ 選擇時間框架", tf_opts_keys, index=tf_idx)
 selected_tf = tf_options[selected_tf_label]
 
-recent_k = st.sidebar.number_input("個股掃描近 N 根 K線", min_value=1, max_value=10, value=2)
+recent_k = st.sidebar.number_input("個股掃描近 N 根 K線", min_value=1, max_value=10, value=int(user_config["recent_k"]))
 
 max_days = 60 if selected_tf in ["15m"] else (730 if selected_tf in ["1h", "4h"] else 1000)
-default_days = min(60, max_days)
+default_days = max(10, min(int(user_config["scan_days"]), max_days))
 scan_days = st.sidebar.slider("載入歷史天數", min_value=10, max_value=max_days, value=default_days)
 
 st.sidebar.subheader("🔍 指標過濾器")
-all_sig_types = [
-    "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
-    "🟢【恐慌抄底】", "🟣【極度超賣】", "🟡【Market Bottom】",
-    "🟪【超賣預警】", "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐確認】", "🟥【OB壓力確認】",
-    "🚀【突破OB壓力】", "⚠️【跌破OB支撐】"
-]
-target_signals = st.sidebar.multiselect("保留含有以下訊號的標的 (若清空則顯示全部)", all_sig_types, default=all_sig_types)
+valid_targets = [s for s in user_config["target_signals"] if s in ALL_SIG_TYPES]
+target_signals = st.sidebar.multiselect("保留含有以下訊號的標的 (若清空則顯示全部)", ALL_SIG_TYPES, default=valid_targets)
+
+# ─── 儲存設定按鈕 ───
+st.sidebar.markdown("---")
+if st.sidebar.button("💾 儲存所有設定檔", use_container_width=True):
+    new_cfg = {
+        "favorites": fav_input,
+        "scan_mode": scan_mode,
+        "max_peg": max_peg,
+        "max_pe": max_pe,
+        "max_pb": max_pb,
+        "scan_us_indices": scan_us_indices,
+        "selected_tf_label": selected_tf_label,
+        "recent_k": recent_k,
+        "scan_days": scan_days,
+        "target_signals": target_signals
+    }
+    save_config(new_cfg)
+    st.sidebar.success("✅ 所有設定參數已成功記憶！")
+    time.sleep(0.6)
+    st.rerun()
 
 scan_btn = st.sidebar.button("🚀 立即啟動掃描", use_container_width=True)
 
@@ -570,7 +606,7 @@ if scan_btn:
 
     failed_tickers = [t for t in all_tickers if t not in successful_tickers]
     if failed_tickers:
-        st.warning(f"⚠️ 以下標的無法取得足夠數據：\n\n **{', '.join(failed_tickers)}**")
+        st.warning(f"⚠️ 以下標的無法取得足夠數據 (可能代號錯誤、近期無交易紀錄，或該時間框架無資料)：\n\n **{', '.join(failed_tickers)}**")
 
     if triggered_results:
         filtered_results = []
