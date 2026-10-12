@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.7", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.7")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板 (純背離測試版)**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.8", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.8")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板 (訊號防連發鎖定版)**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -115,11 +115,11 @@ def scan_signals(df, recent_k):
     rt_upper, rt_lower = rt_basis + 4.0 * rt_vola, rt_basis - 4.0 * rt_vola
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
+    mb_fired_in_cycle = False
     rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
     bull_obs, bear_obs, latest_signals = [], [], []
     last_ph, last_pl, ph_idx, pl_idx = float('inf'), -float('inf'), -1, -1
 
-    # ── 追蹤 WT 純頂背離所需變數 ──
     last_wt_ph_idx = -1
     last_wt_ph_val = -float('inf')
     last_wt_ph_price = -float('inf')
@@ -130,6 +130,10 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
+        # 當跌入紅區時，解鎖 Market Bottom 觸發器
+        if per_under.iloc[i] < 100.0: 
+            mb_fired_in_cycle = False
+            
         if wt1.iloc[i] > -60.0: os_ext_trig = False
         if wt1.iloc[i] > -53.0: os_warn_trig = False
         if wt1.iloc[i] <= 53.0: ob_warn_trig = False
@@ -141,7 +145,6 @@ def scan_signals(df, recent_k):
 
         size = 5
         if i >= size * 2:
-            # ── 訂單塊樞軸偵測 ──
             if max([high.iloc[j] for j in range(i - size*2, i + 1)]) == high.iloc[i - size]:
                 last_ph, ph_idx = high.iloc[i - size], i - size
             if min([low.iloc[j] for j in range(i - size*2, i + 1)]) == low.iloc[i - size]:
@@ -163,27 +166,19 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
-            # ── V5.7: 精準還原 PineScript「純背離」邏輯 (bearDiv_v) ──
             wt_slice = wt1.iloc[i - size*2 : i + 1].values
             left_max = np.max(wt_slice[:size])
             right_max = np.max(wt_slice[size+1:])
             mid_val = wt_slice[size]
             
-            # 若當下確認是一個 WT 的波段高點
             if mid_val >= left_max and mid_val > right_max:
                 curr_wt_ph_val = mid_val
                 curr_wt_ph_price = high.iloc[i - size]
-                
-                # 與上一個波段高點進行比對
                 if last_wt_ph_idx != -1:
                     bars_since = (i - size) - last_wt_ph_idx
-                    # 確保兩波高點間隔在 5 到 60 根 K 線內 (避免抓到太久以前的高點)
                     if 5 <= bars_since <= 60:
-                        # 價格創新高，但動能未創新高 = 頂背離成型！
                         if curr_wt_ph_price > last_wt_ph_price and curr_wt_ph_val < last_wt_ph_val:
                             curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
-                            
-                # 記錄這次的高點，供下次比對
                 last_wt_ph_idx = i - size
                 last_wt_ph_val = curr_wt_ph_val
                 last_wt_ph_price = curr_wt_ph_price
@@ -198,12 +193,14 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
             os_ext_trig = True
             
+        # ── V5.8: Market Bottom 防連發鎖定機制 ──
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
         red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
         had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
         
-        if wt_golden_cross_mb and red_area_was_0 and had_red_area:
+        if wt_golden_cross_mb and red_area_was_0 and had_red_area and not mb_fired_in_cycle:
             curr_sigs.append(f"🟡【Market Bottom】({t_str} @ {c_p})")
+            mb_fired_in_cycle = True
             
         if (wt1.iloc[i] <= -53.0) and wvf_ext.iloc[i] and not os_warn_trig:
             curr_sigs.append(f"🟪【超賣預警】({t_str} @ {c_p})")
@@ -436,7 +433,7 @@ if scan_btn:
                     
     st.markdown("---")
 
-    # ─── 一般個股掃描 (回歸最乾淨單純的訊號) ───
+    # ─── 一般個股掃描 ───
     st.info(f"🚀 正在掃描共 {len(all_tickers)} 檔個股標的...")
     progress_bar = st.progress(0)
     status_text = st.empty()
