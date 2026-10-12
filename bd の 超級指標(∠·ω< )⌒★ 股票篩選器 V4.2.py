@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.2", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.2")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.3", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.3")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板與板塊專屬預警**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -171,7 +171,7 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
             os_ext_trig = True
             
-        # V5.2 Market Bottom 同步版：WT金叉 + 近3K內紅色曾歸0 + 近期有紅區
+        # Market Bottom 邏輯：WT金叉 + 近3K內紅色曾歸0 + 確保近期有紅區
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
         red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
         had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
@@ -187,7 +187,7 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
             top_fired_in_cycle = True
             
-        # V5.2 WT死叉 同步版：WT死叉 + 近3K內綠色曾歸0 + 前K(WT>60)
+        # WT死叉 邏輯：WT死叉 + 近3K內綠色曾歸0 + 前K(WT>60)
         wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1])
         green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i-1] == 0.0) or (per_over.iloc[i-2] == 0.0)
         if wt_dead_cross and green_area_was_0 and (wt1.iloc[i-1] > 60.0) and not wt_dead_trig:
@@ -319,11 +319,20 @@ if scan_btn:
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
-    # ─── V5.2 大盤風向球預警系統 (計分板模式) ───
+    # ─── V5.3 大盤風向球預警系統 (計分板與板塊語意優化) ───
     st.markdown("---")
     st.subheader("🚥 大盤風向球與風險預警 (過去 14 根 K 線)")
     
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
+    
+    # 板塊專屬警告詞典 (讓顯示更白話直覺)
+    board_desc_map = {
+        "SPY": "美股大盤",
+        "QQQ": "科技板塊",
+        "SOXX": "半導體/硬體個股",
+        "^TWII": "台股大盤",
+        "BTC-USD": "幣圈板塊"
+    }
     
     bull_kws_map = {
         "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
@@ -377,16 +386,19 @@ if scan_btn:
                                         bear_detail[name] = bear_detail.get(name, 0) + 1
                                         break
                     
+                    # 取得該標的的板塊名稱
+                    board_name = board_desc_map.get(b_tick, "相關個股")
+                    
                     with b_cols[idx]:
                         st.markdown(f"**{b_tick}**")
                         if bear_count > bull_count:
-                            st.error(f"⚠️ 慎多 (空 {bear_count} | 多 {bull_count})")
+                            st.error(f"⚠️ {board_name} 慎多\n\n(空 {bear_count} | 多 {bull_count})")
                         elif bull_count > bear_count:
-                            st.success(f"🔥 慎空 (多 {bull_count} | 空 {bear_count})")
+                            st.success(f"🔥 {board_name} 慎空\n\n(多 {bull_count} | 空 {bear_count})")
                         elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
-                            st.warning(f"⚖️ 多空交戰 (各 {bull_count})")
+                            st.warning(f"⚖️ {board_name} 震盪\n\n(多空各 {bull_count})")
                         else:
-                            st.info("⚪ 趨勢中性 (近14K無訊號)")
+                            st.info(f"⚪ 趨勢中性\n\n(近14K無訊號)")
                             
                         if bull_count > 0 or bear_count > 0:
                             with st.expander("詳細計分板與時間軸"):
@@ -447,6 +459,7 @@ if scan_btn:
                             else:
                                 df_proc.index = df_proc.index.tz_convert('America/New_York')
                                 
+                        # 個股掃描嚴格使用 user 設定的 recent_k，不被大盤帶偏
                         res_tech = scan_signals(df_proc, recent_k)
                         pass_tech = res_tech is not None
                         
