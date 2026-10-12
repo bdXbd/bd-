@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.0", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.0")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤風向預警系統**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.2", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.2")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -171,9 +171,12 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
             os_ext_trig = True
             
+        # V5.2 Market Bottom 同步版：WT金叉 + 近3K內紅色曾歸0 + 近期有紅區
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
         red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
-        if wt_golden_cross_mb and red_area_was_0:
+        had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
+        
+        if wt_golden_cross_mb and red_area_was_0 and had_red_area:
             curr_sigs.append(f"🟡【Market Bottom】({t_str} @ {c_p})")
             
         if (wt1.iloc[i] <= -53.0) and wvf_ext.iloc[i] and not os_warn_trig:
@@ -184,6 +187,7 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
             top_fired_in_cycle = True
             
+        # V5.2 WT死叉 同步版：WT死叉 + 近3K內綠色曾歸0 + 前K(WT>60)
         wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1])
         green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i-1] == 0.0) or (per_over.iloc[i-2] == 0.0)
         if wt_dead_cross and green_area_was_0 and (wt1.iloc[i-1] > 60.0) and not wt_dead_trig:
@@ -202,6 +206,7 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})")
             rt_last_sig = i
 
+        # 這邊確保個股掃描不被大盤帶偏，只有最後近 N 根 K 線才加入結果
         if i >= n - recent_k:
             for ob in bull_obs:
                 if low.iloc[i-1] >= ob['top'] and low.iloc[i] <= ob['top']: 
@@ -314,13 +319,20 @@ if scan_btn:
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
-    # ─── V5.0 大盤風向球預警系統 ───
+    # ─── V5.2 大盤風向球預警系統 (計分板模式) ───
     st.markdown("---")
     st.subheader("🚥 大盤風向球與風險預警 (過去 14 根 K 線)")
     
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
-    bull_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "超賣預警", "空頭陷阱", "支撐回踩", "突破OB壓力"]
-    bear_kws = ["頂部預警", "WT 死叉", "超買預警", "多頭陷阱", "壓力測試", "跌破OB支撐"]
+    
+    bull_kws_map = {
+        "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
+        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力"
+    }
+    bear_kws_map = {
+        "頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警",
+        "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐"
+    }
     
     with st.spinner("🔄 正在分析大盤宏觀風向..."):
         b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
@@ -344,32 +356,49 @@ if scan_btn:
                     # 大盤強制回看 14 根 K 線
                     b_res = scan_signals(df_proc_b, 14)
                     
-                    bull_count = 0
-                    bear_count = 0
+                    bull_count, bear_count = 0, 0
+                    bull_detail, bear_detail = {}, {}
                     sigs = []
                     
                     if b_res and b_res["觸發指標通知"]:
                         sigs = b_res["觸發指標通知"].split(" ｜ ")
                         for s in sigs:
-                            if any(k in s for k in bull_kws): bull_count += 1
-                            if any(k in s for k in bear_kws): bear_count += 1
+                            found = False
+                            for k, name in bull_kws_map.items():
+                                if k in s:
+                                    bull_count += 1
+                                    bull_detail[name] = bull_detail.get(name, 0) + 1
+                                    found = True
+                                    break
+                            if not found:
+                                for k, name in bear_kws_map.items():
+                                    if k in s:
+                                        bear_count += 1
+                                        bear_detail[name] = bear_detail.get(name, 0) + 1
+                                        break
                     
                     with b_cols[idx]:
                         st.markdown(f"**{b_tick}**")
                         if bear_count > bull_count:
-                            st.error(f"⚠️ 慎多\n\n(偏空訊號: {bear_count})")
-                            with st.expander("詳細訊號"):
-                                for s in sigs: st.caption(s)
+                            st.error(f"⚠️ 慎多 (空 {bear_count} | 多 {bull_count})")
                         elif bull_count > bear_count:
-                            st.success(f"🔥 慎空\n\n(偏多訊號: {bull_count})")
-                            with st.expander("詳細訊號"):
-                                for s in sigs: st.caption(s)
+                            st.success(f"🔥 慎空 (多 {bull_count} | 空 {bear_count})")
                         elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
-                            st.warning(f"⚖️ 多空交戰\n\n(各 {bull_count} 個訊號)")
-                            with st.expander("詳細訊號"):
-                                for s in sigs: st.caption(s)
+                            st.warning(f"⚖️ 多空交戰 (各 {bull_count})")
                         else:
-                            st.info("⚪ 趨勢中性\n\n(近14K無極端訊號)")
+                            st.info("⚪ 趨勢中性 (近14K無訊號)")
+                            
+                        if bull_count > 0 or bear_count > 0:
+                            with st.expander("詳細計分板與時間軸"):
+                                if bull_count > 0:
+                                    st.markdown("**🟢 多方訊號:**")
+                                    for k, v in bull_detail.items(): st.caption(f"• {k}: **{v}**次")
+                                if bear_count > 0:
+                                    st.markdown("**🔴 空方訊號:**")
+                                    for k, v in bear_detail.items(): st.caption(f"• {k}: **{v}**次")
+                                st.markdown("---")
+                                st.markdown("**🕒 觸發時間軸:**")
+                                for s in sigs: st.caption(s)
             except:
                 with b_cols[idx]:
                     st.markdown(f"**{b_tick}**")
