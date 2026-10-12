@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 # ─── 網頁基本設定 ───
 st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.2", page_icon="🎯", layout="wide")
 st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.2")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **SMC 結構 × 動能的 12 象限大盤解析**。")
+st.markdown("精準捕捉 **OB 訂單塊有效反彈**、**WT 恐慌轉折**，並搭載 **SMC 結構 × 動能的 12 象限大盤解析**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -124,6 +124,7 @@ def scan_signals(df, recent_k):
     last_wt_ph_val = -float('inf')
     last_wt_ph_price = -float('inf')
     
+    # SMC 結構追蹤
     internal_trend = 0
     last_smc_tag = "BOS"
 
@@ -180,6 +181,7 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
+            # 純 WT 頂背離判斷
             wt_slice = wt1.iloc[i - size*2 : i + 1].values
             left_max = np.max(wt_slice[:size])
             right_max = np.max(wt_slice[size+1:])
@@ -237,11 +239,12 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})")
             rt_last_sig = i
 
+        # ── V6.2 OB 支撐壓力確認邏輯 (單K留影線 + 多K吞噬站回) ──
         if i >= n - recent_k:
             for ob in bull_obs:
-                # 1. 單K測試: 這根戳進OB，但收盤成功守在上方
-                bounce_1k = (low.iloc[i] <= ob['top']) and (close.iloc[i] > ob['top']) and (close.iloc[i-1] > ob['top'])
-                # 2. 多K確認: 上一根實體在OB內，這根實體強勢站回OB上方
+                # 1. 單K測試: 最低價戳進 OB，但收盤成功守在 OB 頂部之上 (長下影線)
+                bounce_1k = (low.iloc[i] <= ob['top']) and (close.iloc[i] > ob['top'])
+                # 2. 多K確認: 上一根收盤跌進 OB，這根實體強勢站回 OB 頂部之上 (吞噬/站回)
                 bounce_2k = (close.iloc[i-1] <= ob['top']) and (close.iloc[i] > ob['top'])
                 
                 if bounce_1k or bounce_2k:
@@ -250,9 +253,9 @@ def scan_signals(df, recent_k):
                     curr_sigs.append(f"⚠️【跌破OB支撐】({t_str} 破 {ob['bot']:.2f})")
             
             for ob in bear_obs:
-                # 1. 單K測試: 這根戳進OB，但收盤被壓在下方
-                reject_1k = (high.iloc[i] >= ob['bot']) and (close.iloc[i] < ob['bot']) and (close.iloc[i-1] < ob['bot'])
-                # 2. 多K確認: 上一根實體在OB內，這根實體跌破OB下方
+                # 1. 單K測試: 最高價戳進 OB，但收盤被壓在 OB 底部之下 (長上影線)
+                reject_1k = (high.iloc[i] >= ob['bot']) and (close.iloc[i] < ob['bot'])
+                # 2. 多K確認: 上一根收盤進入 OB，這根實體跌破 OB 底部之下 (吞噬/回落)
                 reject_2k = (close.iloc[i-1] >= ob['bot']) and (close.iloc[i] < ob['bot'])
                 
                 if reject_1k or reject_2k:
@@ -444,4 +447,168 @@ if scan_btn:
                     elif smc_trend == -1: smc_state = "🔴空頭CHOCH" if smc_tag == "CHOCH" else "🔴空頭BOS"
                     else: smc_state = "⚪震盪"
                     
-                    title_prefix, action_advice = advices_matrix.get((smc_state, sig
+                    title_prefix, action_advice = advices_matrix.get((smc_state, sig_dir), ("⚪ 震盪整理", "無明顯結構與動能"))
+                    
+                    with b_cols[idx]:
+                        st.markdown(f"**{b_tick}**")
+                        if "🔴" in title_prefix or "⚠️" in title_prefix:
+                            st.error(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
+                        elif "🔥" in title_prefix or "🟢" in title_prefix:
+                            st.success(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
+                        else:
+                            st.warning(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
+                            
+                        if bull_count > 0 or bear_count > 0:
+                            with st.expander("詳細計分板與時間軸"):
+                                if bull_count > 0:
+                                    st.markdown("**🟢 多方訊號:**")
+                                    for k, v in bull_detail.items(): st.caption(f"• {k}: **{v}**次")
+                                if bear_count > 0:
+                                    st.markdown("**🔴 空方訊號:**")
+                                    for k, v in bear_detail.items(): st.caption(f"• {k}: **{v}**次")
+                                st.markdown("---")
+                                st.markdown("**🕒 近14K所有訊號:**")
+                                for s in sigs: st.caption(s)
+            except:
+                with b_cols[idx]:
+                    st.markdown(f"**{b_tick}**")
+                    st.write("讀取失敗")
+                    
+    st.markdown("---")
+
+    # ─── 一般個股掃描 ───
+    st.info(f"🚀 正在掃描共 {len(all_tickers)} 檔個股標的...")
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    chunk_size = 80
+    triggered_results = []
+    successful_tickers = set()
+    start_time = time.time()
+    
+    use_fund = not scan_mode.startswith("1")
+
+    for i in range(0, len(all_tickers), chunk_size):
+        batch = all_tickers[i:i+chunk_size]
+        status_text.text(f"⏳ 正在下載與分析 K 線: {i} / {len(all_tickers)} ...")
+
+        try:
+            data = yf.download(batch, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+            for t in batch:
+                try:
+                    df_t = data[t] if len(batch) > 1 else data
+                    df_t = df_t.dropna(subset=['Close'])
+                    
+                    if len(df_t) > 40:
+                        successful_tickers.add(t)
+                        df_t.name = t
+                        
+                        try:
+                            avg_vol = df_t.groupby(df_t.index.date)['Volume'].sum().mean()
+                        except:
+                            avg_vol = 0
+                        
+                        if selected_tf == "4h":
+                            df_proc = resample_to_tv_4h(df_t)
+                        else:
+                            df_proc = df_t.copy()
+                            if df_proc.index.tz is None:
+                                df_proc.index = pd.to_datetime(df_proc.index).tz_localize('UTC').tz_convert('America/New_York')
+                            else:
+                                df_proc.index = df_proc.index.tz_convert('America/New_York')
+                                
+                        res_tech = scan_signals(df_proc, recent_k)
+                        pass_tech = res_tech is not None and res_tech["觸發指標通知"] != ""
+                        
+                        pass_fund = False
+                        pe_val, peg_val, pb_val = 0, 0, 0
+                        
+                        if use_fund:
+                            try:
+                                info = yf.Ticker(t).info
+                                pe_val = info.get('trailingPE') or 0
+                                peg_val = info.get('pegRatio') or 0
+                                pb_val = info.get('priceToBook') or 0
+                                
+                                cond_pe = (0 < pe_val <= max_pe) if max_pe > 0 else True
+                                cond_peg = (0 < peg_val <= max_peg) if max_peg > 0 else True
+                                cond_pb = (0 < pb_val <= max_pb) if max_pb > 0 else True
+                                
+                                if max_pe == 0 and max_peg == 0 and max_pb == 0:
+                                    pass_fund = True 
+                                else:
+                                    pass_fund = cond_pe and cond_peg and cond_pb
+                            except:
+                                pass_fund = False 
+
+                        should_add = False
+                        if scan_mode.startswith("1"):
+                            should_add = pass_tech
+                        elif scan_mode.startswith("2"):
+                            should_add = pass_tech or pass_fund
+                        elif scan_mode.startswith("3"):
+                            should_add = pass_tech and pass_fund
+                        elif scan_mode.startswith("4"):
+                            should_add = pass_fund
+                            
+                        if should_add:
+                            final_res = {"標的代號": t, "Raw_Volume": avg_vol}
+                            final_res["觸發指標通知"] = res_tech["觸發指標通知"] if pass_tech else "無技術訊號"
+                            
+                            if use_fund:
+                                final_res["PEG (市賺率)"] = f"{peg_val:.2f}" if peg_val > 0 else "N/A"
+                                final_res["P/E"] = f"{pe_val:.2f}" if pe_val > 0 else "N/A"
+                                final_res["P/B"] = f"{pb_val:.2f}" if pb_val > 0 else "N/A"
+                                
+                            triggered_results.append(final_res)
+                except: continue
+        except: continue
+
+        progress_bar.progress(min((i + chunk_size) / len(all_tickers), 1.0))
+
+    status_text.text("🔍 掃描完畢！正在過濾分析結果...")
+
+    failed_tickers = [t for t in all_tickers if t not in successful_tickers]
+    if failed_tickers:
+        st.warning(f"⚠️ 以下標的無法取得足夠數據：\n\n **{', '.join(failed_tickers)}**")
+
+    if triggered_results:
+        filtered_results = []
+        for res in triggered_results:
+            if not target_signals or res["觸發指標通知"] == "無技術訊號": 
+                filtered_results.append(res) 
+            else:
+                sigs = res["觸發指標通知"].split(" ｜ ")
+                match = False
+                for s in sigs:
+                    for target in target_signals:
+                        if target in s:
+                            match = True
+                            break
+                    if match: break
+                
+                if match:
+                    filtered_results.append(res)
+
+        if filtered_results:
+            for res in filtered_results:
+                ticker = res['標的代號']
+                raw_vol = res.get('Raw_Volume', 0)
+                res['日均交易量'] = format_vol(raw_vol)
+                res['Priority'] = 1 if ticker in favorites else 0
+                if ticker in favorites: res['標的代號'] = f"⭐ {ticker}"
+
+            df_report = pd.DataFrame(filtered_results)
+            df_report = df_report.sort_values(by=['Priority', 'Raw_Volume'], ascending=[False, False])
+            
+            cols_to_show = ["標的代號", "日均交易量"]
+            if use_fund:
+                cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
+            cols_to_show.append("觸發指標通知")
+
+            st.success(f"🎯 個股掃描完成！共發現 {len(df_report)} 檔符合條件的標的。(總耗時: {int(time.time() - start_time)} 秒)")
+            st.dataframe(df_report[cols_to_show], use_container_width=True, height=600)
+        else:
+            st.warning(f"🎯 雖然有個股觸發訊號，但全都被「指標過濾器」濾掉了！可以試著把過濾條件放寬一點。")
+    else:
+        st.warning(f"🎯 目前掃描清單內，未發現任何符合條件的個股。(總耗時: {int(time.time() - start_time)} 秒)")
