@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.6", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.6")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.7", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.7")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板 (純背離測試版)**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -51,8 +51,8 @@ def get_us_indices():
     
     if len(combined) < 100:
         backup = ["SPY", "QQQ", "DIA", "IWM", "SOXX", "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AMD", "TSM", "BTC-USD"]
-        return backup, False 
-    return combined, True 
+        return backup, [], [], False 
+    return combined, ndx, sox, True 
 
 def rma(series, length): return series.ewm(alpha=1.0/length, adjust=False).mean()
 
@@ -114,13 +114,15 @@ def scan_signals(df, recent_k):
     rt_vola = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1).ewm(span=55, adjust=False).mean()
     rt_upper, rt_lower = rt_basis + 4.0 * rt_vola, rt_basis - 4.0 * rt_vola
 
-    top_cond_bar = (per_over < per_over.shift(1)) & (per_over.shift(1) > 0.0) & (wt1.shift(1) > 53.0)
-
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
-    top_fired_in_cycle, mb_fired_in_cycle = False, False
     rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
     bull_obs, bear_obs, latest_signals = [], [], []
     last_ph, last_pl, ph_idx, pl_idx = float('inf'), -float('inf'), -1, -1
+
+    # ── 追蹤 WT 純頂背離所需變數 ──
+    last_wt_ph_idx = -1
+    last_wt_ph_val = -float('inf')
+    last_wt_ph_price = -float('inf')
 
     for i in range(2, n):
         if low.iloc[i] < rt_lower.iloc[i]: rt_blw_cnt += 1
@@ -128,15 +130,18 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
-        if (per_under.iloc[i] < 100.0) and not (per_under.iloc[i-1] < 100.0): mb_fired_in_cycle = False
-        if (per_over.iloc[i] > 0.0) and not (per_over.iloc[i-1] > 0.0): top_fired_in_cycle = False
         if wt1.iloc[i] > -60.0: os_ext_trig = False
         if wt1.iloc[i] > -53.0: os_warn_trig = False
         if wt1.iloc[i] <= 53.0: ob_warn_trig = False
         if wt1.iloc[i] <= 60.0: wt_dead_trig = False
 
+        curr_sigs = []
+        t_str = df.index[i].strftime('%m/%d %H:%M') 
+        c_p = f"{close.iloc[i]:.2f}"                
+
         size = 5
         if i >= size * 2:
+            # ── 訂單塊樞軸偵測 ──
             if max([high.iloc[j] for j in range(i - size*2, i + 1)]) == high.iloc[i - size]:
                 last_ph, ph_idx = high.iloc[i - size], i - size
             if min([low.iloc[j] for j in range(i - size*2, i + 1)]) == low.iloc[i - size]:
@@ -158,12 +163,33 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
+            # ── V5.7: 精準還原 PineScript「純背離」邏輯 (bearDiv_v) ──
+            wt_slice = wt1.iloc[i - size*2 : i + 1].values
+            left_max = np.max(wt_slice[:size])
+            right_max = np.max(wt_slice[size+1:])
+            mid_val = wt_slice[size]
+            
+            # 若當下確認是一個 WT 的波段高點
+            if mid_val >= left_max and mid_val > right_max:
+                curr_wt_ph_val = mid_val
+                curr_wt_ph_price = high.iloc[i - size]
+                
+                # 與上一個波段高點進行比對
+                if last_wt_ph_idx != -1:
+                    bars_since = (i - size) - last_wt_ph_idx
+                    # 確保兩波高點間隔在 5 到 60 根 K 線內 (避免抓到太久以前的高點)
+                    if 5 <= bars_since <= 60:
+                        # 價格創新高，但動能未創新高 = 頂背離成型！
+                        if curr_wt_ph_price > last_wt_ph_price and curr_wt_ph_val < last_wt_ph_val:
+                            curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
+                            
+                # 記錄這次的高點，供下次比對
+                last_wt_ph_idx = i - size
+                last_wt_ph_val = curr_wt_ph_val
+                last_wt_ph_price = curr_wt_ph_price
+
         bull_obs = [ob for ob in bull_obs if close.iloc[i] >= ob['bot']][-5:]
         bear_obs = [ob for ob in bear_obs if close.iloc[i] <= ob['top']][-5:]
-
-        curr_sigs = []
-        t_str = df.index[i].strftime('%m/%d %H:%M') 
-        c_p = f"{close.iloc[i]:.2f}"                
 
         if (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1]) and (wt1.iloc[i-1] <= -60.0) and wvf_ext.iloc[i-1] and rsi_red_below.iloc[i-1]: 
             curr_sigs.append(f"🟢【恐慌抄底】({t_str} @ {c_p})")
@@ -182,10 +208,6 @@ def scan_signals(df, recent_k):
         if (wt1.iloc[i] <= -53.0) and wvf_ext.iloc[i] and not os_warn_trig:
             curr_sigs.append(f"🟪【超賣預警】({t_str} @ {c_p})")
             os_warn_trig = True
-            
-        if (top_cond_bar.iloc[i] or top_cond_bar.iloc[i-1] or top_cond_bar.iloc[i-2]) and (close.iloc[i] < open_p.iloc[i]) and (close.iloc[i] < close.iloc[i-1]) and (low.iloc[i] <= low.iloc[i-1]) and (close.iloc[i-1] < open_p.iloc[i-1]) and (close.iloc[i-1] < close.iloc[i-2]) and (low.iloc[i-1] <= low.iloc[i-2]) and not top_fired_in_cycle:
-            curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
-            top_fired_in_cycle = True
             
         wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1])
         green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i-1] == 0.0) or (per_over.iloc[i-2] == 0.0)
@@ -299,9 +321,11 @@ if scan_btn:
     favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
     all_tickers = favorites.copy()
     
+    _, ndx_list, sox_list, _ = get_us_indices() 
+    
     if scan_us_indices:
         with st.spinner("🔄 正在取得美股三大指數成分股清單..."):
-            us_stocks, success = get_us_indices()
+            us_stocks, _, _, success = get_us_indices()
             if success:
                 st.success("✅ 成功從維基百科取得美股清單！")
             else:
@@ -322,7 +346,6 @@ if scan_btn:
     
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
     
-    # 專門針對「板塊內個股」的明確指引
     board_desc_map = {
         "SPY": "美股全市場個股",
         "QQQ": "科技板塊個股",
@@ -386,7 +409,6 @@ if scan_btn:
                     
                     with b_cols[idx]:
                         st.markdown(f"**{b_tick}**")
-                        # 覆巢之下無完卵的直白警告
                         if bear_count > bull_count:
                             st.error(f"🔴 {board_name}偏空\n\n**謹慎做多** (空{bear_count}|多{bull_count})")
                         elif bull_count > bear_count:
