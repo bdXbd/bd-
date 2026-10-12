@@ -257,7 +257,7 @@ with st.sidebar.expander("📊 掃描模式與基本面過濾", expanded=True):
 st.sidebar.divider()
 
 st.sidebar.subheader("🌍 全市場掃描擴充")
-scan_us_indices = st.sidebar.checkbox("同步掃描美股三大指數 (約 900 檔)", value=False)
+scan_us_indices = st.sidebar.checkbox("同步掃描美股三大指數 (SPY,QQQ,SOXX)", value=False)
 
 st.sidebar.subheader("🎯 訊號與時間參數")
 tf_options = {"15分K": "15m", "1小時K": "1h", "4小時K (TV標準)": "4h", "日K": "1d"}
