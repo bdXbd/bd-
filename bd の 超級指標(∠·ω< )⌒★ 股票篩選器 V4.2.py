@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.3", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.3")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板與板塊專屬預警**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.4", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.4")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **智能板塊歸屬與個股逆勢預警**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -51,8 +51,8 @@ def get_us_indices():
     
     if len(combined) < 100:
         backup = ["SPY", "QQQ", "DIA", "IWM", "SOXX", "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AMD", "TSM", "BTC-USD"]
-        return backup, False 
-    return combined, True 
+        return backup, [], [], False 
+    return combined, ndx, sox, True 
 
 def rma(series, length): return series.ewm(alpha=1.0/length, adjust=False).mean()
 
@@ -206,7 +206,6 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})")
             rt_last_sig = i
 
-        # 這邊確保個股掃描不被大盤帶偏，只有最後近 N 根 K 線才加入結果
         if i >= n - recent_k:
             for ob in bull_obs:
                 if low.iloc[i-1] >= ob['top'] and low.iloc[i] <= ob['top']: 
@@ -224,7 +223,7 @@ def scan_signals(df, recent_k):
                 if sig not in latest_signals: latest_signals.append(sig)
 
     if latest_signals:
-        return {"標的代號": df.name if hasattr(df, 'name') else "", "觸發指標通知": " ｜ ".join(latest_signals)}
+        return {"標的代號": df.name if hasattr(df, 'name') else "", "觸發指標通知": latest_signals}
     return None
 
 def format_vol(val):
@@ -265,7 +264,6 @@ with st.sidebar.expander("📊 掃描模式與基本面過濾", expanded=True):
     )
     
     st.markdown("---")
-    st.markdown("*(若選模式 2~4，系統將額外下載財報進行以下過濾)*")
     max_peg = st.number_input("市賺率 (PEG) 低於", min_value=0.0, value=1.0, step=0.1, help="設 0 為不限制")
     max_pe = st.number_input("本益比 (P/E) 低於", min_value=0.0, value=0.0, step=1.0, help="設 0 為不限制")
     max_pb = st.number_input("股價淨值比 (P/B) 低於", min_value=0.0, value=0.0, step=0.1, help="設 0 為不限制")
@@ -302,9 +300,12 @@ if scan_btn:
     favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
     all_tickers = favorites.copy()
     
+    # 無論有沒有勾選全市場，都在背景取得成分股名單（做為板塊判斷的依據）
+    _, ndx_list, sox_list, _ = get_us_indices() 
+    
     if scan_us_indices:
         with st.spinner("🔄 正在取得美股三大指數成分股清單..."):
-            us_stocks, success = get_us_indices()
+            us_stocks, _, _, success = get_us_indices()
             if success:
                 st.success("✅ 成功從維基百科取得美股清單！")
             else:
@@ -319,30 +320,22 @@ if scan_btn:
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
-    # ─── V5.3 大盤風向球預警系統 (計分板與板塊語意優化) ───
+    # ─── 階段一：大盤風向球掃描 (計算板塊基調) ───
     st.markdown("---")
     st.subheader("🚥 大盤風向球與風險預警 (過去 14 根 K 線)")
     
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
-    
-    # 板塊專屬警告詞典 (讓顯示更白話直覺)
     board_desc_map = {
-        "SPY": "美股大盤",
-        "QQQ": "科技板塊",
-        "SOXX": "半導體/硬體個股",
-        "^TWII": "台股大盤",
-        "BTC-USD": "幣圈板塊"
+        "SPY": "美股大盤", "QQQ": "科技板塊", "SOXX": "半導體板塊",
+        "^TWII": "台股大盤", "BTC-USD": "幣圈大盤"
     }
     
-    bull_kws_map = {
-        "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
-        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力"
-    }
-    bear_kws_map = {
-        "頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警",
-        "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐"
-    }
+    bull_kws_map = {"恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom", "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力"}
+    bear_kws_map = {"頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警", "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐"}
     
+    macro_status = {}
+    for b in barometer_tickers: macro_status[b] = {"bull": 0, "bear": 0, "name": board_desc_map.get(b, b)}
+
     with st.spinner("🔄 正在分析大盤宏觀風向..."):
         b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
         b_cols = st.columns(len(barometer_tickers))
@@ -362,43 +355,37 @@ if scan_btn:
                         else:
                             df_proc_b.index = df_proc_b.index.tz_convert('America/New_York')
                     
-                    # 大盤強制回看 14 根 K 線
                     b_res = scan_signals(df_proc_b, 14)
                     
                     bull_count, bear_count = 0, 0
                     bull_detail, bear_detail = {}, {}
-                    sigs = []
+                    sigs = b_res["觸發指標通知"] if b_res else []
                     
-                    if b_res and b_res["觸發指標通知"]:
-                        sigs = b_res["觸發指標通知"].split(" ｜ ")
-                        for s in sigs:
-                            found = False
-                            for k, name in bull_kws_map.items():
+                    for s in sigs:
+                        found = False
+                        for k, name in bull_kws_map.items():
+                            if k in s:
+                                bull_count += 1; bull_detail[name] = bull_detail.get(name, 0) + 1; found = True; break
+                        if not found:
+                            for k, name in bear_kws_map.items():
                                 if k in s:
-                                    bull_count += 1
-                                    bull_detail[name] = bull_detail.get(name, 0) + 1
-                                    found = True
-                                    break
-                            if not found:
-                                for k, name in bear_kws_map.items():
-                                    if k in s:
-                                        bear_count += 1
-                                        bear_detail[name] = bear_detail.get(name, 0) + 1
-                                        break
+                                    bear_count += 1; bear_detail[name] = bear_detail.get(name, 0) + 1; break
                     
-                    # 取得該標的的板塊名稱
-                    board_name = board_desc_map.get(b_tick, "相關個股")
+                    # 將結果存入字典供後續個股判斷
+                    macro_status[b_tick]["bull"] = bull_count
+                    macro_status[b_tick]["bear"] = bear_count
+                    board_name = macro_status[b_tick]["name"]
                     
                     with b_cols[idx]:
                         st.markdown(f"**{b_tick}**")
                         if bear_count > bull_count:
-                            st.error(f"⚠️ {board_name} 慎多\n\n(空 {bear_count} | 多 {bull_count})")
+                            st.error(f"🔴 {board_name} 偏空\n\n(空 {bear_count} | 多 {bull_count})")
                         elif bull_count > bear_count:
-                            st.success(f"🔥 {board_name} 慎空\n\n(多 {bull_count} | 空 {bear_count})")
+                            st.success(f"🟢 {board_name} 偏多\n\n(多 {bull_count} | 空 {bear_count})")
                         elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
                             st.warning(f"⚖️ {board_name} 震盪\n\n(多空各 {bull_count})")
                         else:
-                            st.info(f"⚪ 趨勢中性\n\n(近14K無訊號)")
+                            st.info(f"⚪ 趨勢中性\n\n(無明確訊號)")
                             
                         if bull_count > 0 or bear_count > 0:
                             with st.expander("詳細計分板與時間軸"):
@@ -413,12 +400,11 @@ if scan_btn:
                                 for s in sigs: st.caption(s)
             except:
                 with b_cols[idx]:
-                    st.markdown(f"**{b_tick}**")
-                    st.write("讀取失敗")
+                    st.markdown(f"**{b_tick}**"); st.write("讀取失敗")
                     
     st.markdown("---")
 
-    # ─── 一般個股掃描 ───
+    # ─── 階段二：一般個股掃描與防護網連動 ───
     st.info(f"🚀 正在掃描共 {len(all_tickers)} 檔個股標的...")
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -429,6 +415,10 @@ if scan_btn:
     start_time = time.time()
     
     use_fund = not scan_mode.startswith("1")
+    
+    # 用來判斷多空的關鍵字
+    bull_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "超賣預警", "空頭陷阱", "支撐回踩", "突破OB壓力"]
+    bear_kws = ["頂部預警", "WT 死叉", "超買預警", "多頭陷阱", "壓力測試", "跌破OB支撐"]
 
     for i in range(0, len(all_tickers), chunk_size):
         batch = all_tickers[i:i+chunk_size]
@@ -445,23 +435,46 @@ if scan_btn:
                         successful_tickers.add(t)
                         df_t.name = t
                         
-                        try:
-                            avg_vol = df_t.groupby(df_t.index.date)['Volume'].sum().mean()
-                        except:
-                            avg_vol = 0
+                        # 自動判斷個股屬於哪個大盤板塊
+                        board_ticker = "SPY"
+                        if t.endswith(".TW") or t.endswith(".TWO"): board_ticker = "^TWII"
+                        elif "-USD" in t: board_ticker = "BTC-USD"
+                        elif t in sox_list: board_ticker = "SOXX"
+                        elif t in ndx_list: board_ticker = "QQQ"
                         
-                        if selected_tf == "4h":
-                            df_proc = resample_to_tv_4h(df_t)
+                        m_bull = macro_status[board_ticker]["bull"]
+                        m_bear = macro_status[board_ticker]["bear"]
+                        m_name = macro_status[board_ticker]["name"]
+                        
+                        try: avg_vol = df_t.groupby(df_t.index.date)['Volume'].sum().mean()
+                        except: avg_vol = 0
+                        
+                        if selected_tf == "4h": df_proc = resample_to_tv_4h(df_t)
                         else:
                             df_proc = df_t.copy()
-                            if df_proc.index.tz is None:
-                                df_proc.index = pd.to_datetime(df_proc.index).tz_localize('UTC').tz_convert('America/New_York')
-                            else:
-                                df_proc.index = df_proc.index.tz_convert('America/New_York')
+                            if df_proc.index.tz is None: df_proc.index = pd.to_datetime(df_proc.index).tz_localize('UTC').tz_convert('America/New_York')
+                            else: df_proc.index = df_proc.index.tz_convert('America/New_York')
                                 
-                        # 個股掃描嚴格使用 user 設定的 recent_k，不被大盤帶偏
                         res_tech = scan_signals(df_proc, recent_k)
                         pass_tech = res_tech is not None
+                        
+                        # 幫個股訊號加上大盤逆勢警告
+                        final_sigs_str = "無技術訊號"
+                        if pass_tech:
+                            warned_sigs = []
+                            for sig in res_tech["觸發指標通知"]:
+                                is_bull = any(k in sig for k in bull_kws)
+                                is_bear = any(k in sig for k in bear_kws)
+                                
+                                # 多單碰到大盤偏空 ➔ 不宜追多
+                                if is_bull and m_bear > m_bull:
+                                    sig += f" 🚨(逆勢: {m_name}偏空，不宜追多)"
+                                # 空單碰到大盤偏多 ➔ 不宜猜頭
+                                elif is_bear and m_bull > m_bear:
+                                    sig += f" 🚨(逆勢: {m_name}偏多，不宜猜頭)"
+                                    
+                                warned_sigs.append(sig)
+                            final_sigs_str = " ｜ ".join(warned_sigs)
                         
                         pass_fund = False
                         pe_val, peg_val, pb_val = 0, 0, 0
@@ -476,29 +489,20 @@ if scan_btn:
                                 cond_pe = (0 < pe_val <= max_pe) if max_pe > 0 else True
                                 cond_peg = (0 < peg_val <= max_peg) if max_peg > 0 else True
                                 cond_pb = (0 < pb_val <= max_pb) if max_pb > 0 else True
-                                
-                                if max_pe == 0 and max_peg == 0 and max_pb == 0:
-                                    pass_fund = True 
-                                else:
-                                    pass_fund = cond_pe and cond_peg and cond_pb
-                            except:
-                                pass_fund = False 
+                                pass_fund = True if max_pe == 0 and max_peg == 0 and max_pb == 0 else cond_pe and cond_peg and cond_pb
+                            except: pass_fund = False 
 
                         should_add = False
-                        if scan_mode.startswith("1"):
-                            should_add = pass_tech
-                        elif scan_mode.startswith("2"):
-                            should_add = pass_tech or pass_fund
-                        elif scan_mode.startswith("3"):
-                            should_add = pass_tech and pass_fund
-                        elif scan_mode.startswith("4"):
-                            should_add = pass_fund
+                        if scan_mode.startswith("1"): should_add = pass_tech
+                        elif scan_mode.startswith("2"): should_add = pass_tech or pass_fund
+                        elif scan_mode.startswith("3"): should_add = pass_tech and pass_fund
+                        elif scan_mode.startswith("4"): should_add = pass_fund
                             
                         if should_add:
-                            final_res = res_tech if res_tech else {}
+                            final_res = {}
                             final_res["標的代號"] = t
                             final_res["Raw_Volume"] = avg_vol
-                            final_res["觸發指標通知"] = res_tech["觸發指標通知"] if pass_tech else "無技術訊號"
+                            final_res["觸發指標通知"] = final_sigs_str
                             
                             if use_fund:
                                 final_res["PEG (市賺率)"] = f"{peg_val:.2f}" if peg_val > 0 else "N/A"
@@ -515,7 +519,7 @@ if scan_btn:
 
     failed_tickers = [t for t in all_tickers if t not in successful_tickers]
     if failed_tickers:
-        st.warning(f"⚠️ 以下標的無法取得足夠數據 (可能代號錯誤、近期無交易紀錄，或該時間框架無資料)：\n\n **{', '.join(failed_tickers)}**")
+        st.warning(f"⚠️ 以下標的無法取得足夠數據：\n\n **{', '.join(failed_tickers)}**")
 
     if triggered_results:
         filtered_results = []
@@ -527,13 +531,9 @@ if scan_btn:
                 match = False
                 for s in sigs:
                     for target in target_signals:
-                        if target in s:
-                            match = True
-                            break
+                        if target in s: match = True; break
                     if match: break
-                
-                if match:
-                    filtered_results.append(res)
+                if match: filtered_results.append(res)
 
         if filtered_results:
             for res in filtered_results:
@@ -547,13 +547,12 @@ if scan_btn:
             df_report = df_report.sort_values(by=['Priority', 'Raw_Volume'], ascending=[False, False])
             
             cols_to_show = ["標的代號", "日均交易量"]
-            if use_fund:
-                cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
+            if use_fund: cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
             cols_to_show.append("觸發指標通知")
 
             st.success(f"🎯 個股掃描完成！共發現 {len(df_report)} 檔符合條件的標的。(總耗時: {int(time.time() - start_time)} 秒)")
             st.dataframe(df_report[cols_to_show], use_container_width=True, height=600)
         else:
-            st.warning(f"🎯 雖然有個股觸發訊號，但全都被「指標過濾器」濾掉了！可以試著把過濾條件放寬一點。")
+            st.warning(f"🎯 雖然有個股觸發訊號，但全都被濾掉了！試著把過濾條件放寬一點。")
     else:
         st.warning(f"🎯 目前掃描清單內，未發現任何符合條件的個股。(總耗時: {int(time.time() - start_time)} 秒)")
