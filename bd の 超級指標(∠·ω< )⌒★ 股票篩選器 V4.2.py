@@ -10,13 +10,12 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.8", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V4.8")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並支援 **防呆版基本面掃描**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.0", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.0")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤風向預警系統**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
-# 預設清單已幫你把 STW=F 換成有夜盤且資料完整的 EWT
 DEFAULT_FAVS = "SPY, QQQ, NVDA, TSLA, 2330.TW, 0050.TW, BZ=F, ^TWII, EWT, NQ=F, BTC-USD"
 
 def load_favorites():
@@ -24,7 +23,6 @@ def load_favorites():
         try:
             with open(FAV_FILE, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-                # 簡單過濾掉可能殘留的 JSON 格式 (防呆)
                 if content and not content.startswith("{"): return content
         except: pass
     return DEFAULT_FAVS
@@ -116,12 +114,10 @@ def scan_signals(df, recent_k):
     rt_vola = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1).ewm(span=55, adjust=False).mean()
     rt_upper, rt_lower = rt_basis + 4.0 * rt_vola, rt_basis - 4.0 * rt_vola
 
-    red_dec = ((per_under > per_under.shift(1)) | (per_under == 100.0)) & (per_under.shift(1) < 100.0)
-    mb_combo_bar = red_dec & wvf_ext
     top_cond_bar = (per_over < per_over.shift(1)) & (per_over.shift(1) > 0.0) & (wt1.shift(1) > 53.0)
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
-    top_fired_in_cycle, mb_fired_in_cycle = False, False
+    top_fired_in_cycle = False
     rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
     bull_obs, bear_obs, latest_signals = [], [], []
     last_ph, last_pl, ph_idx, pl_idx = float('inf'), -float('inf'), -1, -1
@@ -132,7 +128,6 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
-        if (per_under.iloc[i] < 100.0) and not (per_under.iloc[i-1] < 100.0): mb_fired_in_cycle = False
         if (per_over.iloc[i] > 0.0) and not (per_over.iloc[i-1] > 0.0): top_fired_in_cycle = False
         if wt1.iloc[i] > -60.0: os_ext_trig = False
         if wt1.iloc[i] > -53.0: os_warn_trig = False
@@ -171,24 +166,41 @@ def scan_signals(df, recent_k):
 
         if (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1]) and (wt1.iloc[i-1] <= -60.0) and wvf_ext.iloc[i-1] and rsi_red_below.iloc[i-1]: 
             curr_sigs.append(f"🟢【恐慌抄底】({t_str} @ {c_p})")
+            
         if (wt1.iloc[i] <= -60.0) and wvf_ext.iloc[i] and rsi_red_below.iloc[i] and not os_ext_trig:
-            curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})"); os_ext_trig = True
-        if (mb_combo_bar.iloc[i] or mb_combo_bar.iloc[i-1] or mb_combo_bar.iloc[i-2]) and (close.iloc[i] > close.iloc[i-1]) and (close.iloc[i-1] > close.iloc[i-2]) and not mb_fired_in_cycle:
-            curr_sigs.append(f"🟡【Market Bottom】({t_str} @ {c_p})"); mb_fired_in_cycle = True
+            curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
+            os_ext_trig = True
+            
+        wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
+        red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
+        if wt_golden_cross_mb and red_area_was_0:
+            curr_sigs.append(f"🟡【Market Bottom】({t_str} @ {c_p})")
+            
         if (wt1.iloc[i] <= -53.0) and wvf_ext.iloc[i] and not os_warn_trig:
-            curr_sigs.append(f"🟪【超賣預警】({t_str} @ {c_p})"); os_warn_trig = True
+            curr_sigs.append(f"🟪【超賣預警】({t_str} @ {c_p})")
+            os_warn_trig = True
+            
         if (top_cond_bar.iloc[i] or top_cond_bar.iloc[i-1] or top_cond_bar.iloc[i-2]) and (close.iloc[i] < open_p.iloc[i]) and (close.iloc[i] < close.iloc[i-1]) and (low.iloc[i] <= low.iloc[i-1]) and (close.iloc[i-1] < open_p.iloc[i-1]) and (close.iloc[i-1] < close.iloc[i-2]) and (low.iloc[i-1] <= low.iloc[i-2]) and not top_fired_in_cycle:
-            curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})"); top_fired_in_cycle = True
-        if (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1]) and (wt1.iloc[i-1] > 60.0) and not wt_dead_trig:
-            curr_sigs.append(f"🟠【WT 死叉】({t_str} @ {c_p})"); wt_dead_trig = True
+            curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
+            top_fired_in_cycle = True
+            
+        wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1])
+        green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i-1] == 0.0) or (per_over.iloc[i-2] == 0.0)
+        if wt_dead_cross and green_area_was_0 and (wt1.iloc[i-1] > 60.0) and not wt_dead_trig:
+            curr_sigs.append(f"🟠【WT 死叉】({t_str} @ {c_p})")
+            wt_dead_trig = True
+            
         if (wt1.iloc[i] >= 53.0) and not ob_warn_trig:
-            curr_sigs.append(f"🟡【超買預警】({t_str} @ {c_p})"); ob_warn_trig = True
+            curr_sigs.append(f"🟡【超買預警】({t_str} @ {c_p})")
+            ob_warn_trig = True
 
         can_fire_rt = (i - rt_last_sig) >= 10
         if (close.iloc[i] > rt_lower.iloc[i]) and ((low.iloc[i] < rt_lower.iloc[i] and close.iloc[i-1] > rt_lower.iloc[i] and rt_blw_cnt <= 10) or (close.iloc[i-1] < rt_lower.iloc[i] and rt_blw_cnt <= 10)) and can_fire_rt and (oversell_count.iloc[i] > 0):
-            curr_sigs.append(f"🛡️【空頭陷阱】({t_str} @ {c_p})"); rt_last_sig = i
+            curr_sigs.append(f"🛡️【空頭陷阱】({t_str} @ {c_p})")
+            rt_last_sig = i
         if (close.iloc[i] < rt_upper.iloc[i]) and ((high.iloc[i] > rt_upper.iloc[i] and close.iloc[i-1] < rt_upper.iloc[i] and rt_abv_cnt <= 10) or (close.iloc[i-1] > rt_upper.iloc[i] and rt_abv_cnt <= 10)) and can_fire_rt and (overbuy_count.iloc[i] > 0):
-            curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})"); rt_last_sig = i
+            curr_sigs.append(f"⚠️【多頭陷阱】({t_str} @ {c_p})")
+            rt_last_sig = i
 
         if i >= n - recent_k:
             for ob in bull_obs:
@@ -236,7 +248,6 @@ if st.sidebar.button("💾 儲存清單"):
 
 st.sidebar.divider()
 
-# 新版：合併為單一防呆選擇器
 with st.sidebar.expander("📊 掃描模式與基本面過濾", expanded=True):
     scan_mode = st.radio(
         "選擇掃描模式：",
@@ -264,7 +275,7 @@ tf_options = {"15分K": "15m", "1小時K": "1h", "4小時K (TV標準)": "4h", "�
 selected_tf_label = st.sidebar.selectbox("⏳ 選擇時間框架", list(tf_options.keys()), index=2)
 selected_tf = tf_options[selected_tf_label]
 
-recent_k = st.sidebar.number_input("掃描近 N 根 K線", min_value=1, max_value=10, value=2)
+recent_k = st.sidebar.number_input("個股掃描近 N 根 K線", min_value=1, max_value=10, value=2)
 
 max_days = 60 if selected_tf in ["15m"] else (730 if selected_tf in ["1h", "4h"] else 1000)
 default_days = min(60, max_days)
@@ -301,7 +312,73 @@ if scan_btn:
         st.error("❌ 收藏清單是空的！")
         st.stop()
 
-    st.info(f"🚀 即將掃描共 {len(all_tickers)} 檔標的...")
+    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+
+    # ─── V5.0 大盤風向球預警系統 ───
+    st.markdown("---")
+    st.subheader("🚥 大盤風向球與風險預警 (過去 14 根 K 線)")
+    
+    barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
+    bull_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "超賣預警", "空頭陷阱", "支撐回踩", "突破OB壓力"]
+    bear_kws = ["頂部預警", "WT 死叉", "超買預警", "多頭陷阱", "壓力測試", "跌破OB支撐"]
+    
+    with st.spinner("🔄 正在分析大盤宏觀風向..."):
+        b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+        b_cols = st.columns(len(barometer_tickers))
+        
+        for idx, b_tick in enumerate(barometer_tickers):
+            try:
+                df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
+                df_b = df_b.dropna(subset=['Close'])
+                if len(df_b) > 40:
+                    df_b.name = b_tick
+                    if selected_tf == "4h":
+                        df_proc_b = resample_to_tv_4h(df_b)
+                    else:
+                        df_proc_b = df_b.copy()
+                        if df_proc_b.index.tz is None:
+                            df_proc_b.index = pd.to_datetime(df_proc_b.index).tz_localize('UTC').tz_convert('America/New_York')
+                        else:
+                            df_proc_b.index = df_proc_b.index.tz_convert('America/New_York')
+                    
+                    # 大盤強制回看 14 根 K 線
+                    b_res = scan_signals(df_proc_b, 14)
+                    
+                    bull_count = 0
+                    bear_count = 0
+                    sigs = []
+                    
+                    if b_res and b_res["觸發指標通知"]:
+                        sigs = b_res["觸發指標通知"].split(" ｜ ")
+                        for s in sigs:
+                            if any(k in s for k in bull_kws): bull_count += 1
+                            if any(k in s for k in bear_kws): bear_count += 1
+                    
+                    with b_cols[idx]:
+                        st.markdown(f"**{b_tick}**")
+                        if bear_count > bull_count:
+                            st.error(f"⚠️ 慎多\n\n(偏空訊號: {bear_count})")
+                            with st.expander("詳細訊號"):
+                                for s in sigs: st.caption(s)
+                        elif bull_count > bear_count:
+                            st.success(f"🔥 慎空\n\n(偏多訊號: {bull_count})")
+                            with st.expander("詳細訊號"):
+                                for s in sigs: st.caption(s)
+                        elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
+                            st.warning(f"⚖️ 多空交戰\n\n(各 {bull_count} 個訊號)")
+                            with st.expander("詳細訊號"):
+                                for s in sigs: st.caption(s)
+                        else:
+                            st.info("⚪ 趨勢中性\n\n(近14K無極端訊號)")
+            except:
+                with b_cols[idx]:
+                    st.markdown(f"**{b_tick}**")
+                    st.write("讀取失敗")
+                    
+    st.markdown("---")
+
+    # ─── 一般個股掃描 ───
+    st.info(f"🚀 正在掃描共 {len(all_tickers)} 檔個股標的...")
     progress_bar = st.progress(0)
     status_text = st.empty()
 
@@ -310,9 +387,6 @@ if scan_btn:
     successful_tickers = set()
     start_time = time.time()
     
-    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
-    
-    # 決定是否需要抓取基本面
     use_fund = not scan_mode.startswith("1")
 
     for i in range(0, len(all_tickers), chunk_size):
@@ -368,7 +442,6 @@ if scan_btn:
                             except:
                                 pass_fund = False 
 
-                        # 根據防呆單選按鈕判斷邏輯
                         should_add = False
                         if scan_mode.startswith("1"):
                             should_add = pass_tech
@@ -383,7 +456,6 @@ if scan_btn:
                             final_res = res_tech if res_tech else {}
                             final_res["標的代號"] = t
                             final_res["Raw_Volume"] = avg_vol
-                            # 若技術面沒觸發但基本面過關，顯示無技術訊號
                             final_res["觸發指標通知"] = res_tech["觸發指標通知"] if pass_tech else "無技術訊號"
                             
                             if use_fund:
@@ -437,9 +509,9 @@ if scan_btn:
                 cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
             cols_to_show.append("觸發指標通知")
 
-            st.success(f"🎯 掃描完成！共發現 {len(df_report)} 檔符合條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
+            st.success(f"🎯 個股掃描完成！共發現 {len(df_report)} 檔符合條件的標的。(總耗時: {int(time.time() - start_time)} 秒)")
             st.dataframe(df_report[cols_to_show], use_container_width=True, height=600)
         else:
-            st.warning(f"🎯 雖然有標的觸發訊號，但全都被「指標過濾器」濾掉了！可以試著把過濾條件放寬一點。")
+            st.warning(f"🎯 雖然有個股觸發訊號，但全都被「指標過濾器」濾掉了！可以試著把過濾條件放寬一點。")
     else:
-        st.warning(f"🎯 目前掃描清單內，未發現任何符合條件的標的。(耗時: {int(time.time() - start_time)} 秒)")
+        st.warning(f"🎯 目前掃描清單內，未發現任何符合條件的個股。(總耗時: {int(time.time() - start_time)} 秒)")
