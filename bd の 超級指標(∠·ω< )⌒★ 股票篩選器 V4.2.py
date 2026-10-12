@@ -10,8 +10,8 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.5", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.5")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.6", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.6")
 st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **宏觀大盤多空計分板**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
@@ -117,7 +117,7 @@ def scan_signals(df, recent_k):
     top_cond_bar = (per_over < per_over.shift(1)) & (per_over.shift(1) > 0.0) & (wt1.shift(1) > 53.0)
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
-    top_fired_in_cycle = False
+    top_fired_in_cycle, mb_fired_in_cycle = False, False
     rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
     bull_obs, bear_obs, latest_signals = [], [], []
     last_ph, last_pl, ph_idx, pl_idx = float('inf'), -float('inf'), -1, -1
@@ -128,6 +128,7 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
+        if (per_under.iloc[i] < 100.0) and not (per_under.iloc[i-1] < 100.0): mb_fired_in_cycle = False
         if (per_over.iloc[i] > 0.0) and not (per_over.iloc[i-1] > 0.0): top_fired_in_cycle = False
         if wt1.iloc[i] > -60.0: os_ext_trig = False
         if wt1.iloc[i] > -53.0: os_warn_trig = False
@@ -171,7 +172,6 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"🟣【極度超賣】({t_str} @ {c_p})")
             os_ext_trig = True
             
-        # Market Bottom 邏輯：WT金叉 + 近3K內紅色曾歸0 + 確保近期有紅區
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
         red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
         had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
@@ -187,7 +187,6 @@ def scan_signals(df, recent_k):
             curr_sigs.append(f"⚠️【頂部預警】({t_str} @ {c_p})")
             top_fired_in_cycle = True
             
-        # WT死叉 邏輯：WT死叉 + 近3K內綠色曾歸0 + 前K(WT>60)
         wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i-1] >= wt2.iloc[i-1])
         green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i-1] == 0.0) or (per_over.iloc[i-2] == 0.0)
         if wt_dead_cross and green_area_was_0 and (wt1.iloc[i-1] > 60.0) and not wt_dead_trig:
@@ -209,13 +208,13 @@ def scan_signals(df, recent_k):
         if i >= n - recent_k:
             for ob in bull_obs:
                 if low.iloc[i-1] >= ob['top'] and low.iloc[i] <= ob['top']: 
-                    curr_sigs.append(f"🧱【OB支撐回踩】({t_str} 踩 {ob['top']:.2f})")
+                    curr_sigs.append(f"🟩【OB支撐回踩】({t_str} 踩 {ob['top']:.2f})")
                 if close.iloc[i-1] >= ob['bot'] and close.iloc[i] < ob['bot']:
                     curr_sigs.append(f"⚠️【跌破OB支撐】({t_str} 破 {ob['bot']:.2f})")
             
             for ob in bear_obs:
                 if high.iloc[i-1] <= ob['bot'] and high.iloc[i] >= ob['bot']: 
-                    curr_sigs.append(f"🧱【OB壓力測試】({t_str} 測 {ob['bot']:.2f})")
+                    curr_sigs.append(f"🟥【OB壓力測試】({t_str} 測 {ob['bot']:.2f})")
                 if close.iloc[i-1] <= ob['top'] and close.iloc[i] > ob['top']:
                     curr_sigs.append(f"🚀【突破OB壓力】({t_str} 破 {ob['top']:.2f})")
             
@@ -288,7 +287,7 @@ st.sidebar.subheader("🔍 指標過濾器")
 all_sig_types = [
     "🟢【恐慌抄底】", "🟣【極度超賣】", "🟡【Market Bottom】",
     "🟪【超賣預警】", "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🧱【OB支撐回踩】", "🧱【OB壓力測試】",
+    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐回踩】", "🟥【OB壓力測試】",
     "🚀【突破OB壓力】", "⚠️【跌破OB支撐】"
 ]
 target_signals = st.sidebar.multiselect("保留含有以下訊號的標的 (若清空則顯示全部)", all_sig_types, default=all_sig_types)
@@ -389,9 +388,9 @@ if scan_btn:
                         st.markdown(f"**{b_tick}**")
                         # 覆巢之下無完卵的直白警告
                         if bear_count > bull_count:
-                            st.error(f"🔴 {board_name}偏空\n\n**請謹慎做多** (空{bear_count}|多{bull_count})")
+                            st.error(f"🔴 {board_name}偏空\n\n**謹慎做多** (空{bear_count}|多{bull_count})")
                         elif bull_count > bear_count:
-                            st.success(f"🟢 {board_name}偏多\n\n**請謹慎做空** (多{bull_count}|空{bear_count})")
+                            st.success(f"🟢 {board_name}偏多\n\n**謹慎做空** (多{bull_count}|空{bear_count})")
                         elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
                             st.warning(f"⚖️ {board_name}震盪\n\n**多空交戰洗盤** (各{bull_count})")
                         else:
