@@ -10,9 +10,9 @@ import os
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.9", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V5.9")
-st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **SMC (BOS/CHOCH) 結構破位偵測**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.0", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.0")
+st.markdown("精準捕捉 **OB 訂單塊**、**WT 恐慌轉折**，並搭載 **SMC 結構 × 動能的 12 象限大盤解析**。")
 
 # ─── 記憶功能 (回歸極簡純收藏) ───
 FAV_FILE = "favorites.txt"
@@ -124,8 +124,9 @@ def scan_signals(df, recent_k):
     last_wt_ph_val = -float('inf')
     last_wt_ph_price = -float('inf')
     
-    # SMC 內部結構趨勢追蹤 (0:震盪, 1:多頭, -1:空頭)
+    # ── SMC 內部結構狀態 ──
     internal_trend = 0
+    last_smc_tag = "BOS"
 
     for i in range(2, n):
         if low.iloc[i] < rt_lower.iloc[i]: rt_blw_cnt += 1
@@ -152,13 +153,13 @@ def scan_signals(df, recent_k):
             if min([low.iloc[j] for j in range(i - size*2, i + 1)]) == low.iloc[i - size]:
                 last_pl, pl_idx = low.iloc[i - size], i - size
 
-            # ── 偵測 SMC 多頭破位 (突破波段高點) ──
+            # ── SMC 多頭破位 ──
             if close.iloc[i] > last_ph and ph_idx != -1:
                 is_choch = (internal_trend == -1)
                 internal_trend = 1
+                last_smc_tag = "CHOCH" if is_choch else "BOS"
                 if i >= n - recent_k:
-                    tag = "CHOCH" if is_choch else "BOS"
-                    curr_sigs.append(f"🟢【多頭 {tag}】({t_str} 破 {last_ph:.2f})")
+                    curr_sigs.append(f"🟢【多頭 {last_smc_tag}】({t_str} 破 {last_ph:.2f})")
                 
                 start_idx = max(0, pl_idx)
                 ob_idx, min_l = start_idx, low.iloc[start_idx]
@@ -167,13 +168,13 @@ def scan_signals(df, recent_k):
                 bull_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_ph = float('inf')
 
-            # ── 偵測 SMC 空頭破位 (跌破波段低點) ──
+            # ── SMC 空頭破位 ──
             if close.iloc[i] < last_pl and pl_idx != -1:
                 is_choch = (internal_trend == 1)
                 internal_trend = -1
+                last_smc_tag = "CHOCH" if is_choch else "BOS"
                 if i >= n - recent_k:
-                    tag = "CHOCH" if is_choch else "BOS"
-                    curr_sigs.append(f"🔴【空頭 {tag}】({t_str} 破 {last_pl:.2f})")
+                    curr_sigs.append(f"🔴【空頭 {last_smc_tag}】({t_str} 破 {last_pl:.2f})")
                 
                 start_idx = max(0, ph_idx)
                 ob_idx, max_h = start_idx, high.iloc[start_idx]
@@ -182,7 +183,6 @@ def scan_signals(df, recent_k):
                 bear_obs.append({'top': high.iloc[ob_idx], 'bot': low.iloc[ob_idx]})
                 last_pl = -float('inf')
 
-            # WT純背離計算
             wt_slice = wt1.iloc[i - size*2 : i + 1].values
             left_max = np.max(wt_slice[:size])
             right_max = np.max(wt_slice[size+1:])
@@ -256,9 +256,12 @@ def scan_signals(df, recent_k):
             for sig in curr_sigs:
                 if sig not in latest_signals: latest_signals.append(sig)
 
-    if latest_signals:
-        return {"標的代號": df.name if hasattr(df, 'name') else "", "觸發指標通知": " ｜ ".join(latest_signals)}
-    return None
+    return {
+        "標的代號": df.name if hasattr(df, 'name') else "", 
+        "觸發指標通知": " ｜ ".join(latest_signals) if latest_signals else "",
+        "SMC_Trend": internal_trend,
+        "SMC_Tag": last_smc_tag
+    }
 
 def format_vol(val):
     if val == 0 or pd.isna(val): return "N/A"
@@ -354,32 +357,33 @@ if scan_btn:
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
-    # ─── 大盤風向球預警系統 ───
+    # ─── 大盤 12 象限動能矩陣分析 ───
     st.markdown("---")
-    st.subheader("🚥 大盤環境與板塊操作建議 (回看 14 根 K 線)")
+    st.subheader("🚥 大盤環境與板塊操作建議 (SMC 結構 × 動能 12 象限)")
     
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
     
-    board_desc_map = {
-        "SPY": "美股全市場個股",
-        "QQQ": "科技板塊個股",
-        "SOXX": "半導體及硬體個股",
-        "^TWII": "台股大盤及相關個股",
-        "BTC-USD": "加密貨幣板塊"
+    # 動能過濾器 (排除 SMC 結構，只算震盪與反轉指標)
+    bull_kws_map = {"恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom", "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力"}
+    bear_kws_map = {"頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警", "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐"}
+    
+    # 12 象限解讀矩陣 (結構, 動能) -> (標題, 操作建議)
+    advices_matrix = {
+        ("🟢多頭BOS", "多"): ("🔥 主升浪爆發", "雙多共振，逢低做多，多單抱牢"),
+        ("🟢多頭BOS", "空"): ("⚠️ 多頭遇壓", "主升浪遇阻 / 動能背離，防守或減碼"),
+        ("🟢多頭BOS", "平"): ("🟢 高位震盪", "多頭趨勢延續，蓄勢待發"),
+        ("🟢多頭CHOCH", "多"): ("🔥 右側起漲", "結構扭轉且動能共振，積極建倉"),
+        ("🟢多頭CHOCH", "空"): ("⚠️ 反彈遇阻", "初升浪遇阻，防二次探底"),
+        ("🟢多頭CHOCH", "平"): ("🟢 底部築底", "結構已轉多，留意突破方向"),
+        ("🔴空頭CHOCH", "多"): ("⚠️ 跌深反抽", "留意空頭回馬槍 (誘多)，搶短慎行"),
+        ("🔴空頭CHOCH", "空"): ("🔴 頂部確立", "右側做頭確認，逢高逃頂 / 順勢建空"),
+        ("🔴空頭CHOCH", "平"): ("🔴 頂部震盪", "高位結構破壞，防守觀望為主"),
+        ("🔴空頭BOS", "多"): ("⚠️ 探底背離", "主跌段動能竭盡，摸底需嚴設停損"),
+        ("🔴空頭BOS", "空"): ("🔴 主跌浪崩盤", "雙空共振，空單抱牢 / 順勢高空"),
+        ("🔴空頭BOS", "平"): ("🔴 低位磨底", "跌勢中繼整理，尚未明確見底"),
     }
     
-    bull_kws_map = {
-        "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
-        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐回踩": "OB支撐", "突破OB壓力": "突破OB壓力",
-        "多頭 CHOCH": "多頭 CHOCH", "多頭 BOS": "多頭 BOS"
-    }
-    bear_kws_map = {
-        "頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警",
-        "多頭陷阱": "多頭陷阱", "壓力測試": "OB壓力", "跌破OB支撐": "跌破OB支撐",
-        "空頭 CHOCH": "空頭 CHOCH", "空頭 BOS": "空頭 BOS"
-    }
-    
-    with st.spinner("🔄 正在分析大盤宏觀風向..."):
+    with st.spinner("🔄 正在計算 12 象限矩陣..."):
         b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
         b_cols = st.columns(len(barometer_tickers))
         
@@ -404,35 +408,41 @@ if scan_btn:
                     bull_detail, bear_detail = {}, {}
                     sigs = []
                     
+                    # 分析動能 (多 / 空 / 平)
                     if b_res and b_res["觸發指標通知"]:
                         sigs = b_res["觸發指標通知"].split(" ｜ ")
                         for s in sigs:
                             found = False
                             for k, name in bull_kws_map.items():
                                 if k in s:
-                                    bull_count += 1
-                                    bull_detail[name] = bull_detail.get(name, 0) + 1
-                                    found = True
-                                    break
+                                    bull_count += 1; bull_detail[name] = bull_detail.get(name, 0) + 1; found = True; break
                             if not found:
                                 for k, name in bear_kws_map.items():
                                     if k in s:
-                                        bear_count += 1
-                                        bear_detail[name] = bear_detail.get(name, 0) + 1
-                                        break
+                                        bear_count += 1; bear_detail[name] = bear_detail.get(name, 0) + 1; break
+                                        
+                    if bear_count > bull_count: sig_dir = "空"
+                    elif bull_count > bear_count: sig_dir = "多"
+                    else: sig_dir = "平"
                     
-                    board_name = board_desc_map.get(b_tick, "相關個股")
+                    # 取得底層 SMC 狀態
+                    smc_trend = b_res["SMC_Trend"] if b_res else 0
+                    smc_tag = b_res["SMC_Tag"] if b_res else "BOS"
+                    
+                    if smc_trend == 1: smc_state = "🟢多頭CHOCH" if smc_tag == "CHOCH" else "🟢多頭BOS"
+                    elif smc_trend == -1: smc_state = "🔴空頭CHOCH" if smc_tag == "CHOCH" else "🔴空頭BOS"
+                    else: smc_state = "⚪震盪"
+                    
+                    title_prefix, action_advice = advices_matrix.get((smc_state, sig_dir), ("⚪ 震盪整理", "無明顯結構與動能"))
                     
                     with b_cols[idx]:
                         st.markdown(f"**{b_tick}**")
-                        if bear_count > bull_count:
-                            st.error(f"🔴 {board_name}偏空\n\n**謹慎做多** (空{bear_count}|多{bull_count})")
-                        elif bull_count > bear_count:
-                            st.success(f"🟢 {board_name}偏多\n\n**謹慎做空** (多{bull_count}|空{bear_count})")
-                        elif bull_count > 0 and bear_count > 0 and bull_count == bear_count:
-                            st.warning(f"⚖️ {board_name}震盪\n\n**多空交戰洗盤** (各{bull_count})")
+                        if "🔴" in title_prefix or "⚠️" in title_prefix:
+                            st.error(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
+                        elif "🔥" in title_prefix or "🟢" in title_prefix:
+                            st.success(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
                         else:
-                            st.info(f"⚪ 趨勢中性\n\n(近14K無極端訊號)")
+                            st.warning(f"{title_prefix}\n\n**{action_advice}**\n\n(結構: {smc_state} | 動能: 多{bull_count} 空{bear_count})")
                             
                         if bull_count > 0 or bear_count > 0:
                             with st.expander("詳細計分板與時間軸"):
@@ -443,7 +453,7 @@ if scan_btn:
                                     st.markdown("**🔴 空方訊號:**")
                                     for k, v in bear_detail.items(): st.caption(f"• {k}: **{v}**次")
                                 st.markdown("---")
-                                st.markdown("**🕒 觸發時間軸:**")
+                                st.markdown("**🕒 近14K所有訊號:**")
                                 for s in sigs: st.caption(s)
             except:
                 with b_cols[idx]:
@@ -494,7 +504,7 @@ if scan_btn:
                                 df_proc.index = df_proc.index.tz_convert('America/New_York')
                                 
                         res_tech = scan_signals(df_proc, recent_k)
-                        pass_tech = res_tech is not None
+                        pass_tech = res_tech is not None and res_tech["觸發指標通知"] != ""
                         
                         pass_fund = False
                         pe_val, peg_val, pb_val = 0, 0, 0
@@ -528,9 +538,7 @@ if scan_btn:
                             should_add = pass_fund
                             
                         if should_add:
-                            final_res = res_tech if res_tech else {}
-                            final_res["標的代號"] = t
-                            final_res["Raw_Volume"] = avg_vol
+                            final_res = {"標的代號": t, "Raw_Volume": avg_vol}
                             final_res["觸發指標通知"] = res_tech["觸發指標通知"] if pass_tech else "無技術訊號"
                             
                             if use_fund:
