@@ -11,24 +11,23 @@ import json
 warnings.filterwarnings("ignore")
 
 # ─── 網頁基本設定 ───
-st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.3", page_icon="🎯", layout="wide")
-st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.3")
-st.markdown("精準捕捉 **OB 訂單塊有效反彈**、**WT 恐慌轉折**，並搭載 **12 象限大盤解析與全域記憶功能**。")
+st.set_page_config(page_title="bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.5", page_icon="🎯", layout="wide")
+st.title("🎯 bd の 超級指標(∠·ω )⌒★ 股票篩選器 V6.5")
+st.markdown("精準捕捉 **OB 訂單塊有效反彈**、**MB 恐慌修復起漲**，並搭載 **SMC 12 象限大盤解析與全域記憶功能**。")
 
 # ─── 記憶功能升級 (全域設定檔) ───
 CONFIG_FILE = "scanner_config.json"
-FAV_FILE = "favorites.txt"  # 保留相容性讀取舊版清單
+FAV_FILE = "favorites.txt"
 
+# V6.5: 移除無效的突破/跌破OB訊號，專注於結構破位(CHOCH/BOS)與OB支撐壓力確認
 ALL_SIG_TYPES = [
     "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
     "🟢【恐慌抄底】", "🟣【極度超賣】", "🟡【Market Bottom】",
     "🟪【超賣預警】", "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐確認】", "🟥【OB壓力確認】",
-    "🚀【突破OB壓力】", "⚠️【跌破OB支撐】"
+    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】", "🟩【OB支撐確認】", "🟥【OB壓力確認】"
 ]
 
 def load_config():
-    # 預設設定
     config = {
         "favorites": "SPY, QQQ, NVDA, TSLA, 2330.TW, 0050.TW, BZ=F, ^TWII, EWT, NQ=F, BTC-USD",
         "scan_mode": "1. 僅看技術指標 (預設)",
@@ -42,7 +41,6 @@ def load_config():
         "target_signals": ALL_SIG_TYPES
     }
     
-    # 向下相容：如果舊版 favorites.txt 存在，優先讀取裡面的股票
     if os.path.exists(FAV_FILE):
         try:
             with open(FAV_FILE, "r", encoding="utf-8") as f:
@@ -51,7 +49,6 @@ def load_config():
                     config["favorites"] = content
         except: pass
 
-    # 讀取 JSON 設定檔
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -150,6 +147,7 @@ def scan_signals(df, recent_k):
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
     mb_fired_in_cycle = False
+    vix_in_red_cycle = False
     rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
     bull_obs, bear_obs, latest_signals = [], [], []
     last_ph, last_pl, ph_idx, pl_idx = float('inf'), -float('inf'), -1, -1
@@ -167,7 +165,16 @@ def scan_signals(df, recent_k):
         if high.iloc[i] > rt_upper.iloc[i]: rt_abv_cnt += 1
         else: rt_abv_cnt = 0
 
-        if per_under.iloc[i] < 100.0: 
+        is_red_area = per_under.iloc[i] < 100.0
+        was_red_area = per_under.iloc[i-1] < 100.0 if i > 0 else False
+        
+        if is_red_area and not was_red_area:
+            vix_in_red_cycle = False
+            
+        if is_red_area and wvf_ext.iloc[i]:
+            vix_in_red_cycle = True
+
+        if is_red_area: 
             mb_fired_in_cycle = False
             
         if wt1.iloc[i] > -60.0: os_ext_trig = False
@@ -231,6 +238,7 @@ def scan_signals(df, recent_k):
                 last_wt_ph_val = curr_wt_ph_val
                 last_wt_ph_price = curr_wt_ph_price
 
+        # 即時清理失效的 OB (跌破支撐 / 突破壓力)
         bull_obs = [ob for ob in bull_obs if close.iloc[i] >= ob['bot']][-5:]
         bear_obs = [ob for ob in bear_obs if close.iloc[i] <= ob['top']][-5:]
 
@@ -242,10 +250,10 @@ def scan_signals(df, recent_k):
             os_ext_trig = True
             
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i-1] <= wt2.iloc[i-1])
-        red_area_was_0 = (per_under.iloc[i] == 100.0) or (per_under.iloc[i-1] == 100.0) or (per_under.iloc[i-2] == 100.0)
-        had_red_area = per_under.iloc[max(0, i-9):i+1].min() < 100.0
+        red_is_zero_now = (per_under.iloc[i] == 100.0)
+        red_was_present = per_under.iloc[max(0, i-3):i].min() < 100.0
         
-        if wt_golden_cross_mb and red_area_was_0 and had_red_area and not mb_fired_in_cycle:
+        if wt_golden_cross_mb and red_is_zero_now and red_was_present and vix_in_red_cycle and not mb_fired_in_cycle:
             curr_sigs.append(f"🟡【Market Bottom】({t_str} @ {c_p})")
             mb_fired_in_cycle = True
             
@@ -272,21 +280,18 @@ def scan_signals(df, recent_k):
             rt_last_sig = i
 
         if i >= n - recent_k:
+            # 專注於有效的 OB 反彈確認
             for ob in bull_obs:
                 bounce_1k = (low.iloc[i] <= ob['top']) and (close.iloc[i] > ob['top'])
                 bounce_2k = (close.iloc[i-1] <= ob['top']) and (close.iloc[i] > ob['top'])
                 if bounce_1k or bounce_2k:
                     curr_sigs.append(f"🟩【OB支撐確認】({t_str} 守穩 {ob['top']:.2f})")
-                elif close.iloc[i-1] >= ob['bot'] and close.iloc[i] < ob['bot']:
-                    curr_sigs.append(f"⚠️【跌破OB支撐】({t_str} 破 {ob['bot']:.2f})")
             
             for ob in bear_obs:
                 reject_1k = (high.iloc[i] >= ob['bot']) and (close.iloc[i] < ob['bot'])
                 reject_2k = (close.iloc[i-1] >= ob['bot']) and (close.iloc[i] < ob['bot'])
                 if reject_1k or reject_2k:
                     curr_sigs.append(f"🟥【OB壓力確認】({t_str} 受阻 {ob['bot']:.2f})")
-                elif close.iloc[i-1] <= ob['top'] and close.iloc[i] > ob['top']:
-                    curr_sigs.append(f"🚀【突破OB壓力】({t_str} 破 {ob['top']:.2f})")
             
             for sig in curr_sigs:
                 if sig not in latest_signals: latest_signals.append(sig)
@@ -417,8 +422,9 @@ if scan_btn:
         "BTC-USD": "加密貨幣板塊"
     }
     
-    bull_kws_map = {"恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom", "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐確認": "OB支撐", "突破OB壓力": "突破OB壓力"}
-    bear_kws_map = {"頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警", "多頭陷阱": "多頭陷阱", "壓力確認": "OB壓力", "跌破OB支撐": "跌破OB支撐"}
+    # 移除突破與跌破OB的關鍵字
+    bull_kws_map = {"恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom", "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "支撐確認": "OB支撐", "多頭 CHOCH": "多頭 CHOCH", "多頭 BOS": "多頭 BOS"}
+    bear_kws_map = {"頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警", "多頭陷阱": "多頭陷阱", "壓力確認": "OB壓力", "空頭 CHOCH": "空頭 CHOCH", "空頭 BOS": "空頭 BOS"}
     
     advices_matrix = {
         ("🟢多頭BOS", "多"): ("🔥 主升浪爆發", "雙多共振，逢低做多，多單抱牢"),
@@ -606,7 +612,7 @@ if scan_btn:
 
     failed_tickers = [t for t in all_tickers if t not in successful_tickers]
     if failed_tickers:
-        st.warning(f"⚠️ 以下標的無法取得足夠數據 (可能代號錯誤、近期無交易紀錄，或該時間框架無資料)：\n\n **{', '.join(failed_tickers)}**")
+        st.warning(f"⚠️ 以下標的無法取得足夠數據：\n\n **{', '.join(failed_tickers)}**")
 
     if triggered_results:
         filtered_results = []
