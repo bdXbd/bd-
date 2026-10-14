@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.1",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.2",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -38,7 +38,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.1")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.2")
 st.caption("100% 鏡像同步 TradingView V3.8 指標：搭載 **24 態纏論×SMC 大盤風向標 (含近14K動能修正 & 近2K準備抄底警報)** × **OB 共振重疊** × **纏論中樞延伸/共振確認** × **自動風控 (SL/TP)**")
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -64,7 +64,8 @@ ALL_SIG_TYPES = [
 ]
 
 PRESET_FILTERS = {
-    "🔥 全部訊號 (預設全開)": ALL_SIG_TYPES,
+    "🛠️ 自訂勾選訊號 (記憶模式)": None,
+    "🔥 全部訊號 (全開)": ALL_SIG_TYPES,
     "💎 右側回踩做多 (中樞/共振/OB支撐 + Market Bottom)": [
         "🌟【中樞共振 Buy】", "🟪【OB共振支撐】", "🟠【中樞 Buy】", "🟩【OB支撐確認】", "🟡【Market Bottom】"
     ],
@@ -77,8 +78,7 @@ PRESET_FILTERS = {
     "🔴 逃頂與做空警訊 (頂部預警 + WT死叉 + 壓力受阻 + 多頭陷阱)": [
         "🌟【中樞共振 Sell】", "🟪【OB共振壓力】", "🟠【中樞 Sell】", "🟥【OB壓力確認】",
         "⚠️【頂部預警】", "🟠【WT 死叉】", "⚠️【多頭陷阱】", "💠【纏論賣點】"
-    ],
-    "🛠️ 自訂勾選訊號": None
+    ]
 }
 
 def load_config():
@@ -621,7 +621,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
                 'tp': c_val + cur_atr * 3.0,
                 'risk_tag': f"結構突破 ({last_smc_tag})"
             })
-            # 對齊 Pine Script storeOrdeBlock(internalHigh, true, BULLISH)：從 ih_idx 到 i 找最低 parsed_low
             s_idx = max(0, ih_idx)
             s_slice = parsed_low[s_idx : i]
             if len(s_slice) > 0:
@@ -648,7 +647,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
                 'tp': c_val - cur_atr * 3.0,
                 'risk_tag': f"結構跌破 ({last_smc_tag})"
             })
-            # 對齊 Pine Script storeOrdeBlock(internalLow, true, BEARISH)：從 il_idx 到 i 找最高 parsed_high
             s_idx = max(0, il_idx)
             s_slice = parsed_high[s_idx : i]
             if len(s_slice) > 0:
@@ -1021,10 +1019,8 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
                             final_zs_hi = min(final_zs_hi, i_top)
                             final_zs_lo = max(final_zs_lo, i_bot)
                             final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
-                            # 從 active_int_obs 移除被中樞共振吸收的原 SMC OB
                             active_int_obs = [x for x in active_int_obs if x['ob_idx'] != s_ob['ob_idx']]
 
-                # 檢查是否與已生成的紫色共振框也發生重疊
                 for x in list(active_int_obs):
                     if x.get('is_reso', False) and x['bias'] == break_bias:
                         if min(ob_hi, x['top']) > max(ob_lo, x['bot']):
@@ -1058,7 +1054,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
                     'type_name': ("🌟 中樞×SMC共振支撐" if break_bias == 1 else "🌟 中樞×SMC共振壓力") if has_zs_reso else ("🟠 中樞延伸支撐" if break_bias == 1 else "🟠 中樞延伸壓力")
                 }
 
-                # 掃描中樞 OB / 中樞共振 OB 形成後的所有 K 棒回踩確認
                 scan_start = max(break_idx + 1, final_zs_bix + 1)
                 prev_zs_sig = False
 
@@ -1318,7 +1313,7 @@ def format_vol(val):
     return f"{val:.0f}"
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁側邊欄設定
+# 網頁側邊欄設定 (含雙向綁定 Session State 確保打叉 × 100% 生效)
 # ════════════════════════════════════════════════════════════════════════════
 user_config = load_config()
 
@@ -1355,9 +1350,9 @@ with st.sidebar.expander("🛠️ 指標細節對齊設定 (鏡像 Pine Script)"
     include_chan_bs = st.checkbox("額外掃描纏論 1/2/3 買賣點", value=bool(user_config.get("include_chan_bs", False)))
     scan_us_indices = st.checkbox("🌍 擴充掃描美股三大指數成分股 (~500檔)", value=bool(user_config.get("scan_us_indices", False)))
 
+# ── 戰術濾網與多選框雙向綁定 (支援自由打叉 × 與一鍵全選/清空) ──
 st.sidebar.subheader("⚡ 戰術濾網與訊號過濾")
 
-# 初始化 Session State，確保手動打叉 (×) 後絕對不會被預設清單蓋掉
 if "ms_target_signals" not in st.session_state:
     saved_sigs = [s for s in user_config.get("target_signals", ALL_SIG_TYPES) if s in ALL_SIG_TYPES]
     st.session_state.ms_target_signals = saved_sigs
@@ -1369,7 +1364,7 @@ def on_preset_change():
 
 st.sidebar.selectbox(
     "快速套用戰術濾網 (切換後可直接下方微調打叉)：",
-    ["🛠️ 自訂勾選訊號 (記憶模式)"] + [k for k in PRESET_FILTERS.keys() if k != "🛠️ 自訂勾選訊號"],
+    list(PRESET_FILTERS.keys()),
     index=0,
     key="preset_selector",
     on_change=on_preset_change
@@ -1422,7 +1417,7 @@ with col_b1:
             "show_swing_ob": show_swing_ob,
             "include_chan_bs": include_chan_bs,
             "ob_rr": ob_rr,
-            "target_signals": target_signals
+            "target_signals": list(st.session_state.ms_target_signals)
         }
         save_config(new_cfg)
         st.sidebar.success("✅ 設定已記憶！")
@@ -1712,7 +1707,7 @@ if scan_btn:
     if failed_tickers:
         st.caption(f"⚠️ 無法取得足夠長度的標的 ({len(failed_tickers)} 檔)：`{', '.join(failed_tickers[:20])}`")
 
-    # ── 過濾符合觸發條件的個股 ──
+    # ── 過濾符合觸發條件的個股 (嚴格遵守多選框打叉 × 移除後的清單) ──
     triggered_rows = []
     for r in all_scanned_rows:
         if scan_mode.startswith("1"):
@@ -1727,7 +1722,7 @@ if scan_btn:
         if not should_add:
             continue
 
-        # 若僅看基本面 (模式4) 且無技術訊號則放行；否則嚴格依照多選框內保留的訊號過濾
+        # 若僅看基本面且無技術訊號則直接放行；否則必須命中 target_signals 內勾選的訊號
         if r["觸發指標通知"] == "無技術訊號":
             if not scan_mode.startswith("1"):
                 triggered_rows.append(r)
@@ -1766,7 +1761,9 @@ if scan_btn:
     }
 
     with tab1:
-        if triggered_rows:
+        if len(target_signals) == 0 and scan_mode.startswith("1"):
+            st.info("💡 你目前已清空所有訊號過濾器！請在左側點擊『✅ 全選所有訊號』或從下拉選單選擇戰術濾網。")
+        elif triggered_rows:
             df_report = pd.DataFrame(triggered_rows)
             df_report = df_report.sort_values(by=['Priority', '訊號數', 'Raw_Volume'], ascending=[False, False, False])
 
