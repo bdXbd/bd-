@@ -1572,19 +1572,11 @@ if scan_btn:
                         if k2_bull_hits:
                             hit_names = " + ".join(k2_bull_hits[:2])
                             dip_word = "⚡ 準備抄底！" if (smc_id in [3, 4] or any("抄底" in x or "超賣" in x or "Bottom" in x or "陷阱" in x for x in k2_bull_hits)) else "⚡ 右側回踩買點！"
-                            k2_banner_html = f"""
-                            <div style="background:rgba(0,230,118,0.22);border:1px solid #00e676;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#00e676;font-weight:700;">
-                                {dip_word} 近2K觸發：{hit_names}
-                            </div>
-                            """
+                            k2_banner_html = f'<div style="background:rgba(0,230,118,0.22);border:1px solid #00e676;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#00e676;font-weight:700;">{dip_word} 近2K觸發：{hit_names}</div>'
                             style_cls = "bull"
                         elif k2_bear_hits:
                             hit_names = " + ".join(k2_bear_hits[:2])
-                            k2_banner_html = f"""
-                            <div style="background:rgba(255,82,82,0.22);border:1px solid #ff5252;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#ff5252;font-weight:700;">
-                                🚨 準備逃頂/防守！ 近2K觸發：{hit_names}
-                            </div>
-                            """
+                            k2_banner_html = f'<div style="background:rgba(255,82,82,0.22);border:1px solid #ff5252;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#ff5252;font-weight:700;">🚨 準備逃頂/防守！ 近2K觸發：{hit_names}</div>'
                             if style_cls == "bull":
                                 style_cls = "warn"
 
@@ -1592,23 +1584,21 @@ if scan_btn:
                         chg_val = b_res["漲跌幅"]
                         chg_col = "#00e676" if chg_val >= 0 else "#ff5252"
 
-                        st.markdown(f"""
-                        <div class="baro-card baro-{style_cls}">
-                            <div class="baro-title">
-                                <span>{b_tick}</span>
-                                <span class="baro-price">{px_val:.2f} <span style="color:{chg_col};font-size:0.82rem;">({chg_val:+.2f}%)</span></span>
-                            </div>
-                            {k2_banner_html}
-                            <span class="baro-badge badge-{style_cls}">【{smc_ui} + {chan_tag}】{tactical_tag}</span>
-                            <div class="baro-advice">24態劇本：{base_advice}</div>
-                            <div class="baro-sub">
-                                • 14K動能: <b>{mom_14k_str}</b><br>
-                                • 指標: WT <span class="metric-pill">{b_res['WT快線']:.1f}</span> ｜ RSI <span class="metric-pill">{b_res['平均RSI']:.1f}</span> ({b_res['RSI狀態']})<br>
-                                • 支撐: {b_res['最近支撐區']}<br>
-                                • 壓力: {b_res['最近壓力區']}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        card_html = (
+                            f'<div class="baro-card baro-{style_cls}">'
+                            f'<div class="baro-title"><span>{b_tick}</span>'
+                            f'<span class="baro-price">{px_val:.2f} <span style="color:{chg_col};font-size:0.82rem;">({chg_val:+.2f}%)</span></span></div>'
+                            f'{k2_banner_html}'
+                            f'<span class="baro-badge badge-{style_cls}">【{smc_ui} + {chan_tag}】{tactical_tag}</span>'
+                            f'<div class="baro-advice">24態劇本：{base_advice}</div>'
+                            f'<div class="baro-sub">'
+                            f'• 14K動能: <b>{mom_14k_str}</b><br>'
+                            f'• 指標: WT <span class="metric-pill">{b_res["WT快線"]:.1f}</span> ｜ RSI <span class="metric-pill">{b_res["平均RSI"]:.1f}</span> ({b_res["RSI狀態"]})<br>'
+                            f'• 支撐: {b_res["最近支撐區"]}<br>'
+                            f'• 壓力: {b_res["最近壓力區"]}'
+                            f'</div></div>'
+                        )
+                        st.markdown(card_html, unsafe_allow_html=True)
 
                         with st.expander("🕒 近 14K 訊號計分與時間軸"):
                             if bull_detail:
