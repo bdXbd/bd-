@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.3",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.4",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -38,11 +38,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.3")
-st.caption("精簡極速版：100% 鏡像 TradingView V3.8 指標 ｜ **24 態纏論×SMC 大盤風向標 (含近14K動能修正 & 近2K準備抄底)** ｜ **嚴格成交量排序 & 0秒即時過濾**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.4")
+st.caption("精簡極速版：移除結構突破與纏論買賣點雜訊 ｜ **全共振區強制回踩確認 (OB / OB共振 / 中樞 / 中樞共振)** ｜ **嚴格成交量排序 & 0秒即時過濾**")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 訊號清單與預設戰術組合定義
+# 訊號清單與預設戰術組合定義 (已移除 CHOCH / BOS / 纏論123買賣點)
 # ════════════════════════════════════════════════════════════════════════════
 CONFIG_FILE = "scanner_config.json"
 FAV_FILE = "favorites.txt"
@@ -54,9 +54,7 @@ ALL_SIG_TYPES = [
     "🟩【OB支撐確認】", "🟥【OB壓力確認】",
     "🟢【恐慌抄底】", "🟡【Market Bottom】", "🟣【極度超賣】", "🟪【超賣預警】",
     "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】",
-    "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
-    "💠【纏論買點】", "💠【纏論賣點】"
+    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】"
 ]
 
 PRESET_FILTERS = {
@@ -65,15 +63,15 @@ PRESET_FILTERS = {
     "💎 右側回踩做多 (中樞/共振/OB支撐 + Market Bottom)": [
         "🌟【中樞共振 Buy】", "🟪【OB共振支撐】", "🟠【中樞 Buy】", "🟩【OB支撐確認】", "🟡【Market Bottom】"
     ],
-    "🌟 頂級共振狙擊 (僅看中樞共振 + OB共振)": [
+    "🌟 頂級共振狙擊 (僅看中樞共振 + OB共振回踩確認)": [
         "🌟【中樞共振 Buy】", "🌟【中樞共振 Sell】", "🟪【OB共振支撐】", "🟪【OB共振壓力】"
     ],
-    "🟢 左側恐慌抄底 (恐慌抄底 + 極度超賣 + 空頭陷阱 + 纏論買點)": [
-        "🟢【恐慌抄底】", "🟣【極度超賣】", "🛡️【空頭陷阱】", "🟡【Market Bottom】", "💠【纏論買點】"
+    "🟢 左側恐慌抄底 (恐慌抄底 + 極度超賣 + 空頭陷阱 + Market Bottom)": [
+        "🟢【恐慌抄底】", "🟣【極度超賣】", "🛡️【空頭陷阱】", "🟡【Market Bottom】"
     ],
-    "🔴 逃頂與做空警訊 (頂部預警 + WT死叉 + 壓力受阻 + 多頭陷阱)": [
+    "🔴 逃頂與做空警訊 (頂部預警 + WT死叉 + 壓力回踩受阻 + 多頭陷阱)": [
         "🌟【中樞共振 Sell】", "🟪【OB共振壓力】", "🟠【中樞 Sell】", "🟥【OB壓力確認】",
-        "⚠️【頂部預警】", "🟠【WT 死叉】", "⚠️【多頭陷阱】", "💠【纏論賣點】"
+        "⚠️【頂部預警】", "🟠【WT 死叉】", "⚠️【多頭陷阱】"
     ]
 }
 
@@ -90,7 +88,6 @@ def load_config():
         "scan_days": 90,
         "strict_confirm": False,
         "show_swing_ob": False,
-        "include_chan_bs": False,
         "vol_sort_by": "日均交易量 (推薦)",
         "fav_first": True,
         "target_signals": ALL_SIG_TYPES
@@ -112,6 +109,11 @@ def load_config():
                 config.update(saved_config)
         except Exception:
             pass
+
+    # 自動過濾掉舊設定檔中已移除的 CHOCH / BOS / 纏論買賣點
+    config["target_signals"] = [s for s in config.get("target_signals", ALL_SIG_TYPES) if s in ALL_SIG_TYPES]
+    if not config["target_signals"]:
+        config["target_signals"] = list(ALL_SIG_TYPES)
 
     return config
 
@@ -218,7 +220,7 @@ def get_tv_link(ticker):
     return f"https://www.tradingview.com/chart/?symbol={t}"
 
 # ════════════════════════════════════════════════════════════════════════════
-# 纏論核心引擎 (100% 鏡像移植 Pine Script 第二部分)
+# 纏論核心引擎 (用於中樞延伸 OB 與大盤 24 態面板，不發送 123 買賣點訊號)
 # ════════════════════════════════════════════════════════════════════════════
 def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     n = len(close_v)
@@ -383,7 +385,7 @@ def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     return bi_arr, zs_arr, sg_arr
 
 # ════════════════════════════════════════════════════════════════════════════
-# 完整技術指標掃描引擎 (100% 鏡像 Pine Script V3.8)
+# 完整技術指標掃描引擎 (OB / OB共振 / 中樞 / 中樞共振 皆嚴格回踩確認)
 # ════════════════════════════════════════════════════════════════════════════
 def update_active_obs(src_obs, max_obs=5, show_overlap=True):
     act_obs = []
@@ -428,7 +430,7 @@ def update_active_obs(src_obs, max_obs=5, show_overlap=True):
     return act_obs, overlapped_origins
 
 
-def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, include_chan_bs=False):
+def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     if df is None or len(df) < 40:
         return None
 
@@ -508,12 +510,16 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
     parsed_high = np.where(high_vol, low_v, high_v)
     parsed_low = np.where(high_vol, high_v, low_v)
 
-    # 6. MACD (12, 26, 9) 供纏論背馳計算
+    # 6. MACD 與纏論中樞運算 (先定位最近中樞位置，供後續逐K棒回踩確認)
     ema12 = close_s.ewm(span=12, adjust=False).mean()
     ema26 = close_s.ewm(span=26, adjust=False).mean()
     macd_line = ema12 - ema26
     sig_line = macd_line.ewm(span=9, adjust=False).mean()
     hist_v = (macd_line - sig_line).fillna(0.0).values
+
+    bi_arr, zs_arr, sg_arr = run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4)
+    last_z = zs_arr[-1] if len(zs_arr) > 0 else None
+    zs_search_start = max(2, bi_arr[last_z['startBi']]['b0']) if (last_z is not None and len(bi_arr) > last_z['startBi']) else (n + 1)
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
     last_ext_os_sl = np.nan
@@ -534,6 +540,12 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
     internal_obs, swing_obs = [], []
     active_int_obs, active_sw_obs = [], []
     ob_buy_events, ob_sell_events, other_events = [], [], []
+
+    # 中樞延伸 OB 動態狀態 (與 SMC OB 同步在迴圈中進行生成、共振交集、失效剃除與回踩確認)
+    curr_zs_raw = None
+    active_zs_zone = None
+    last_zs_buy_state, last_zs_sell_state = False, False
+    zs_events = []
 
     last_wt_ph_idx, last_wt_ph_val, last_wt_ph_price = -1, -float('inf'), -float('inf')
 
@@ -577,13 +589,12 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
         else:
             sw_leg[i] = sw_leg[i - 1]
 
-        # 內部結構突破
+        # 內部結構突破 (僅更新趨勢與生成 OB，不發送 CHOCH/BOS 訊號)
         if not np.isnan(ih_val) and close_v[i] > ih_val and close_v[i - 1] <= ih_val and not ih_crossed and ih_val != sh_val:
             ih_crossed = True
             is_choch = (internal_trend == -1)
             internal_trend = 1
             last_smc_tag = "CHOCH" if is_choch else "BOS"
-            other_events.append({'bar_i': i, 'sig_str': f"🟢【多頭 {last_smc_tag}】({t_str} 破 {ih_val:.2f})"})
             s_idx = max(0, ih_idx)
             s_slice = parsed_low[s_idx : i]
             if len(s_slice) > 0:
@@ -597,7 +608,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
             is_choch = (internal_trend == 1)
             internal_trend = -1
             last_smc_tag = "CHOCH" if is_choch else "BOS"
-            other_events.append({'bar_i': i, 'sig_str': f"🔴【空頭 {last_smc_tag}】({t_str} 破 {il_val:.2f})"})
             s_idx = max(0, il_idx)
             s_slice = parsed_high[s_idx : i]
             if len(s_slice) > 0:
@@ -629,7 +639,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
                     if len(swing_obs) > 100:
                         swing_obs.pop()
 
-        # 剃除失效 OB 與更新共振區
+        # 剃除失效 SMC OB 與更新共振區
         internal_obs = [ob for ob in internal_obs if not ((ob['bias'] == -1 and high_v[i] > ob['top']) or (ob['bias'] == 1 and low_v[i] < ob['bot']))]
         if show_swing_ob:
             swing_obs = [ob for ob in swing_obs if not ((ob['bias'] == -1 and high_v[i] > ob['top']) or (ob['bias'] == 1 and low_v[i] < ob['bot']))]
@@ -637,6 +647,109 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
         active_int_obs, _ = update_active_obs(internal_obs, max_obs=5, show_overlap=True)
         if show_swing_ob:
             active_sw_obs, _ = update_active_obs(swing_obs, max_obs=5, show_overlap=True)
+
+        # ── 中樞延伸 OB 與 中樞×SMC 共振更新 & 嚴格回踩確認 ──
+        if last_z is not None and i >= zs_search_start:
+            # 1) 檢查既有中樞 OB 是否被跌破/突破而失效 (Mitigated)
+            if curr_zs_raw is not None and i > curr_zs_raw['break_idx']:
+                if (curr_zs_raw['bias'] == 1 and low_v[i] < curr_zs_raw['ob_lo']) or (curr_zs_raw['bias'] == -1 and high_v[i] > curr_zs_raw['ob_hi']):
+                    curr_zs_raw = None
+                    active_zs_zone = None
+                    last_zs_buy_state, last_zs_sell_state = False, False
+                    zs_events = []
+
+            # 2) 檢查是否在當根 K 棒突破中樞上緣 ZG 或跌破下緣 ZD，生成新的中樞延伸 OB
+            if close_v[i] > last_z['ZG'] and close_v[i - 1] <= last_z['ZG']:
+                ob_idx = i - 1
+                curr_zs_raw = {
+                    'ob_hi': float(parsed_high[ob_idx]),
+                    'ob_lo': float(parsed_low[ob_idx]),
+                    'ob_idx': ob_idx,
+                    'break_idx': i,
+                    'bias': 1
+                }
+                last_zs_buy_state, last_zs_sell_state = False, False
+                zs_events = []
+            elif close_v[i] < last_z['ZD'] and close_v[i - 1] >= last_z['ZD']:
+                ob_idx = i - 1
+                curr_zs_raw = {
+                    'ob_hi': float(parsed_high[ob_idx]),
+                    'ob_lo': float(parsed_low[ob_idx]),
+                    'ob_idx': ob_idx,
+                    'break_idx': i,
+                    'bias': -1
+                }
+                last_zs_buy_state, last_zs_sell_state = False, False
+                zs_events = []
+
+            # 3) 若當前存在有效的中樞延伸 OB，計算是否與存活的 SMC OB 發生重疊共振，並進行回踩確認
+            if curr_zs_raw is not None:
+                ob_hi, ob_lo, ob_idx = curr_zs_raw['ob_hi'], curr_zs_raw['ob_lo'], curr_zs_raw['ob_idx']
+                break_bias = curr_zs_raw['bias']
+                has_zs_reso = False
+                final_zs_hi, final_zs_lo = ob_hi, ob_lo
+                final_zs_bix = ob_idx
+                final_zs_gen = curr_zs_raw['break_idx']
+
+                for idx_o in range(min(5, len(internal_obs))):
+                    s_ob = internal_obs[idx_o]
+                    if s_ob['bias'] == break_bias:
+                        i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
+                        if i_top > i_bot:
+                            has_zs_reso = True
+                            final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
+                            final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
+                            final_zs_gen = max(final_zs_gen, s_ob['gen_i'])
+                            active_int_obs = [x for x in active_int_obs if x['ob_idx'] != s_ob['ob_idx']]
+
+                for x in list(active_int_obs):
+                    if x.get('is_reso', False) and x['bias'] == break_bias:
+                        if min(ob_hi, x['top']) > max(ob_lo, x['bot']):
+                            has_zs_reso = True
+                            final_zs_gen = max(final_zs_gen, x['gen_i'])
+                            active_int_obs.remove(x)
+
+                if show_swing_ob:
+                    for idx_o in range(min(5, len(swing_obs))):
+                        s_ob = swing_obs[idx_o]
+                        if s_ob['bias'] == break_bias:
+                            i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
+                            if i_top > i_bot:
+                                has_zs_reso = True
+                                final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
+                                final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
+                                final_zs_gen = max(final_zs_gen, s_ob['gen_i'])
+                                active_sw_obs = [x for x in active_sw_obs if x['ob_idx'] != s_ob['ob_idx']]
+
+                if final_zs_hi <= final_zs_lo:
+                    final_zs_hi, final_zs_lo = ob_hi, ob_lo
+
+                active_zs_zone = {
+                    'top': final_zs_hi, 'bot': final_zs_lo, 'ob_idx': final_zs_bix, 'gen_i': final_zs_gen,
+                    'bias': break_bias, 'is_reso': has_zs_reso,
+                    'type_name': ("🌟 中樞共振支撐" if break_bias == 1 else "🌟 中樞共振壓力") if has_zs_reso else ("🟠 中樞支撐" if break_bias == 1 else "🟠 中樞壓力")
+                }
+
+                # 必須在該中樞區/共振區正式建立 (gen_i) 之後的 K 棒，回踩並收盤確認才觸發！
+                if i > active_zs_zone['gen_i']:
+                    if break_bias == 1:
+                        is_touch = (low_v[i] <= final_zs_hi) or (close_v[i - 1] <= final_zs_hi and close_v[i - 1] >= final_zs_lo)
+                        is_conf = (close_v[i] > final_zs_hi)
+                        is_trend = (close_v[i] > open_v[i]) if strict_confirm else True
+                        cur_zs_b = is_touch and is_conf and is_trend
+                        if cur_zs_b and not last_zs_buy_state:
+                            tag_name = "🌟【中樞共振 Buy】" if has_zs_reso else "🟠【中樞 Buy】"
+                            zs_events.append({'bar_i': i, 'sig_str': f"{tag_name}({t_str} 守穩 {final_zs_hi:.2f})"})
+                        last_zs_buy_state = cur_zs_b
+                    else:
+                        is_touch = (high_v[i] >= final_zs_lo) or (close_v[i - 1] >= final_zs_lo and close_v[i - 1] <= final_zs_hi)
+                        is_conf = (close_v[i] < final_zs_lo)
+                        is_trend = (close_v[i] < open_v[i]) if strict_confirm else True
+                        cur_zs_s = is_touch and is_conf and is_trend
+                        if cur_zs_s and not last_zs_sell_state:
+                            tag_name = "🌟【中樞共振 Sell】" if has_zs_reso else "🟠【中樞 Sell】"
+                            zs_events.append({'bar_i': i, 'sig_str': f"{tag_name}({t_str} 受阻 {final_zs_lo:.2f})"})
+                        last_zs_sell_state = cur_zs_s
 
         # WaveTrend 與 RSI 雷達動能訊號
         if wt1.iloc[i] > -60.0:
@@ -730,12 +843,12 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
             rt_last_sig = i
             other_events.append({'bar_i': i, 'sig_str': f"⚠️【多頭陷阱】({t_str} @ {c_p})"})
 
-        # SMC OB 與 OB 共振回踩確認
+        # SMC OB 與 OB 共振回踩確認 (必須在 i > gen_i 即區間/共振正式形成之後回踩確認才觸發)
         def check_retest_list(ob_list):
             b_trig, s_trig = False, False
             m_b_ob, m_s_ob = None, None
             for ob in ob_list:
-                if i > ob['ob_idx']:
+                if i > ob.get('gen_i', ob['ob_idx']):
                     top, bot = ob['top'], ob['bot']
                     if ob['bias'] == 1:
                         is_touch = (low_v[i] <= top) or (close_v[i - 1] <= top and close_v[i - 1] >= bot)
@@ -780,110 +893,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
             sig_txt = f"🟪【OB共振壓力】({t_str} 受阻 {match_s_ob['bot']:.2f})" if match_s_ob.get('is_reso') else f"🟥【OB壓力確認】({t_str} 受阻 {match_s_ob['bot']:.2f})"
             ob_sell_events.append({'bar_i': i, 'sig_str': sig_txt, 'parent_ob_idx': match_s_ob['ob_idx']})
 
-    # 7. 纏論與最近中樞延伸 OB / 中樞 × SMC 共振確認
-    bi_arr, zs_arr, sg_arr = run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4)
-    zs_events = []
-    active_zs_zone = None
-
-    if len(zs_arr) > 0:
-        last_z = zs_arr[-1]
-        search_start = max(1, bi_arr[last_z['startBi']]['b0']) if len(bi_arr) > last_z['startBi'] else 1
-        break_idx, break_bias = -1, 0
-
-        for k in range(search_start, n):
-            if close_v[k] > last_z['ZG'] and close_v[k - 1] <= last_z['ZG']:
-                break_idx, break_bias = k, 1
-            elif close_v[k] < last_z['ZD'] and close_v[k - 1] >= last_z['ZD']:
-                break_idx, break_bias = k, -1
-
-        if break_idx > 0:
-            ob_idx = break_idx - 1
-            ob_hi, ob_lo = float(parsed_high[ob_idx]), float(parsed_low[ob_idx])
-
-            mitigated = False
-            if break_idx + 1 <= n - 1:
-                for m in range(break_idx + 1, n):
-                    if (break_bias == 1 and low_v[m] < ob_lo) or (break_bias == -1 and high_v[m] > ob_hi):
-                        mitigated = True
-                        break
-
-            if not mitigated:
-                has_zs_reso = False
-                final_zs_hi, final_zs_lo, final_zs_bix = ob_hi, ob_lo, ob_idx
-
-                for idx_o in range(min(5, len(internal_obs))):
-                    s_ob = internal_obs[idx_o]
-                    if s_ob['bias'] == break_bias:
-                        i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
-                        if i_top > i_bot:
-                            has_zs_reso = True
-                            final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
-                            final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
-                            active_int_obs = [x for x in active_int_obs if x['ob_idx'] != s_ob['ob_idx']]
-
-                for x in list(active_int_obs):
-                    if x.get('is_reso', False) and x['bias'] == break_bias:
-                        if min(ob_hi, x['top']) > max(ob_lo, x['bot']):
-                            has_zs_reso = True
-                            active_int_obs.remove(x)
-
-                if show_swing_ob:
-                    for idx_o in range(min(5, len(swing_obs))):
-                        s_ob = swing_obs[idx_o]
-                        if s_ob['bias'] == break_bias:
-                            i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
-                            if i_top > i_bot:
-                                has_zs_reso = True
-                                final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
-                                final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
-                                active_sw_obs = [x for x in active_sw_obs if x['ob_idx'] != s_ob['ob_idx']]
-
-                if final_zs_hi <= final_zs_lo:
-                    final_zs_hi, final_zs_lo = ob_hi, ob_lo
-
-                active_zs_zone = {
-                    'top': final_zs_hi, 'bot': final_zs_lo, 'ob_idx': final_zs_bix, 'bias': break_bias,
-                    'type_name': ("🌟 中樞共振支撐" if break_bias == 1 else "🌟 中樞共振壓力") if has_zs_reso else ("🟠 中樞支撐" if break_bias == 1 else "🟠 中樞壓力")
-                }
-
-                scan_start = max(break_idx + 1, final_zs_bix + 1)
-                prev_zs_sig = False
-                if scan_start <= n - 1:
-                    for m in range(scan_start, n):
-                        m_lo, m_hi, m_cl, m_op = low_v[m], high_v[m], close_v[m], open_v[m]
-                        prev_cl = close_v[m - 1]
-                        m_t_str = df.index[m].strftime('%m/%d %H:%M')
-
-                        if break_bias == 1:
-                            is_touch = (m_lo <= final_zs_hi) or (prev_cl <= final_zs_hi and prev_cl >= final_zs_lo)
-                            is_conf = (m_cl > final_zs_hi)
-                            is_trend = (m_cl > m_op) if strict_confirm else True
-                            cur_sig = is_touch and is_conf and is_trend
-                            if cur_sig and not prev_zs_sig:
-                                tag_name = "🌟【中樞共振 Buy】" if has_zs_reso else "🟠【中樞 Buy】"
-                                zs_events.append({'bar_i': m, 'sig_str': f"{tag_name}({m_t_str} 守穩 {final_zs_hi:.2f})"})
-                            prev_zs_sig = cur_sig
-                        else:
-                            is_touch = (m_hi >= final_zs_lo) or (prev_cl >= final_zs_lo and prev_cl <= final_zs_hi)
-                            is_conf = (m_cl < final_zs_lo)
-                            is_trend = (m_cl < m_op) if strict_confirm else True
-                            cur_sig = is_touch and is_conf and is_trend
-                            if cur_sig and not prev_zs_sig:
-                                tag_name = "🌟【中樞共振 Sell】" if has_zs_reso else "🟠【中樞 Sell】"
-                                zs_events.append({'bar_i': m, 'sig_str': f"{tag_name}({m_t_str} 受阻 {final_zs_lo:.2f})"})
-                            prev_zs_sig = cur_sig
-
-    if include_chan_bs and len(sg_arr) > 0:
-        for sg in sg_arr:
-            pos = sg['pos']
-            if 0 <= pos < n:
-                sg_t_str = df.index[pos].strftime('%m/%d %H:%M')
-                if sg['isLong']:
-                    other_events.append({'bar_i': pos, 'sig_str': f"💠【纏論買點】{sg['label']} ({sg_t_str} @ {sg['price']:.2f})"})
-                else:
-                    other_events.append({'bar_i': pos, 'sig_str': f"💠【纏論賣點】{sg['label']} ({sg_t_str} @ {sg['price']:.2f})"})
-
-    # 8. 垃圾回收：僅保留當前仍存活的有效 SMC OB 回踩標籤
+    # 8. 垃圾回收：僅保留當前仍存活的有效 SMC OB / 共振回踩標籤
     valid_ob_indices = {ob['ob_idx'] for ob in active_int_obs} | {ob['ob_idx'] for ob in active_sw_obs}
     valid_buy_events = [ev for ev in ob_buy_events if ev['parent_ob_idx'] in valid_ob_indices]
     valid_sell_events = [ev for ev in ob_sell_events if ev['parent_ob_idx'] in valid_ob_indices]
@@ -1050,7 +1060,6 @@ with st.sidebar.expander("🛠️ 進階與全市場擴充設定", expanded=Fals
     scan_us_indices = st.checkbox("🌍 同步掃描美股三大指數 (SPY, QQQ, SOXX)", value=bool(user_config.get("scan_us_indices", False)))
     strict_confirm = st.checkbox("嚴格收線確認 (Buy需收紅/Sell需收綠)", value=bool(user_config.get("strict_confirm", False)))
     show_swing_ob = st.checkbox("回踩包含擺動 OB (Swing OB)", value=bool(user_config.get("show_swing_ob", False)))
-    include_chan_bs = st.checkbox("額外掃描纏論 1/2/3 買賣點", value=bool(user_config.get("include_chan_bs", False)))
 
     st.markdown("---")
     scan_options = [
@@ -1116,7 +1125,6 @@ with col_b1:
             "scan_days": scan_days,
             "strict_confirm": strict_confirm,
             "show_swing_ob": show_swing_ob,
-            "include_chan_bs": include_chan_bs,
             "vol_sort_by": vol_sort_by,
             "fav_first": fav_first,
             "target_signals": list(st.session_state.ms_target_signals)
@@ -1161,7 +1169,7 @@ if scan_btn:
                 df_b = df_b.dropna(subset=['Close'])
                 if len(df_b) > 40:
                     df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
-                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob, include_chan_bs=True)
+                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
             except Exception:
                 baro_results[b_tick] = None
 
@@ -1188,7 +1196,7 @@ if scan_btn:
                         avg_vol = calc_robust_avg_vol(df_t)
 
                         df_proc = resample_to_tv_4h(df_t, t) if selected_tf == "4h" else df_t.copy()
-                        res_tech = scan_signals(df_proc, recent_k=recent_k, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob, include_chan_bs=include_chan_bs)
+                        res_tech = scan_signals(df_proc, recent_k=recent_k, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
                         if res_tech is None:
                             continue
 
@@ -1265,15 +1273,15 @@ if "scan_cache" in st.session_state:
     bull_kws_map = {
         "中樞共振 Buy": "中樞共振Buy", "OB共振支撐": "OB共振支撐", "中樞 Buy": "中樞Buy", "OB支撐確認": "OB支撐",
         "恐慌抄底": "恐慌抄底", "極度超賣": "極度超賣", "Market Bottom": "Market Bottom",
-        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱", "多頭 CHOCH": "多頭CHOCH", "多頭 BOS": "多頭BOS", "纏論買點": "纏論買點"
+        "超賣預警": "超賣預警", "空頭陷阱": "空頭陷阱"
     }
     bear_kws_map = {
         "中樞共振 Sell": "中樞共振Sell", "OB共振壓力": "OB共振壓力", "中樞 Sell": "中樞Sell", "OB壓力確認": "OB壓力",
         "頂部預警": "頂部預警", "WT 死叉": "WT死叉", "超買預警": "超買預警",
-        "多頭陷阱": "多頭陷阱", "空頭 CHOCH": "空頭CHOCH", "空頭 BOS": "空頭BOS", "纏論賣點": "纏論賣點"
+        "多頭陷阱": "多頭陷阱"
     }
-    bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認", "纏論買點"]
-    top_escape_kws = ["頂部預警", "WT 死叉", "多頭陷阱", "中樞共振 Sell", "OB共振壓力", "中樞 Sell", "OB壓力確認", "纏論賣點"]
+    bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認"]
+    top_escape_kws = ["頂部預警", "WT 死叉", "多頭陷阱", "中樞共振 Sell", "OB共振壓力", "中樞 Sell", "OB壓力確認"]
 
     b_cols = st.columns(len(barometer_tickers))
     for idx, b_tick in enumerate(barometer_tickers):
