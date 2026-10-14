@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.0",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.1",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -21,21 +21,21 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* 卡片與標籤美化 */
+    /* 頂部 24 態大盤風向標卡片美化 */
     .baro-card {
-        background: linear-gradient(145deg, rgba(30,34,45,0.95), rgba(20,23,31,0.95));
+        background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96));
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 12px;
-        padding: 14px 16px;
+        padding: 14px 15px;
         margin-bottom: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
         color: #e0e3eb;
     }
     .baro-bull { border-left: 5px solid #00e676; }
     .baro-bear { border-left: 5px solid #ff5252; }
     .baro-warn { border-left: 5px solid #ffca28; }
     .baro-title {
-        font-size: 1.1rem;
+        font-size: 1.08rem;
         font-weight: 800;
         display: flex;
         justify-content: space-between;
@@ -43,7 +43,7 @@ st.markdown("""
         margin-bottom: 6px;
     }
     .baro-price {
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         font-family: monospace;
         color: #00e5ff;
     }
@@ -51,7 +51,7 @@ st.markdown("""
         display: inline-block;
         padding: 3px 8px;
         border-radius: 6px;
-        font-size: 0.82rem;
+        font-size: 0.80rem;
         font-weight: 700;
         margin-bottom: 6px;
     }
@@ -59,19 +59,19 @@ st.markdown("""
     .badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }
     .badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }
     .baro-advice {
-        font-size: 0.86rem;
-        font-weight: 600;
+        font-size: 0.85rem;
+        font-weight: 700;
         color: #ffffff;
         margin-bottom: 6px;
     }
     .baro-sub {
-        font-size: 0.76rem;
+        font-size: 0.75rem;
         color: #9ba2b0;
-        line-height: 1.45;
+        line-height: 1.48;
     }
     .metric-pill {
-        background: rgba(255,255,255,0.06);
-        padding: 2px 6px;
+        background: rgba(255,255,255,0.07);
+        padding: 1px 6px;
         border-radius: 4px;
         font-family: monospace;
         color: #ffd600;
@@ -79,8 +79,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.0")
-st.caption("100% 鏡像同步 TradingView V3.8 指標引擎：完整支援 **SMC 訂單塊 × OB 共振重疊 × 纏論中樞延伸/共振確認 × 自動風控止損止盈 (SL/TP)**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.1")
+st.caption("100% 鏡像同步 TradingView V3.8 指標：搭載 **24 態纏論×SMC 大盤風向標 (含近14K動能修正 & 近2K準備抄底警報)** × **OB 共振重疊** × **纏論中樞延伸/共振確認** × **自動風控 (SL/TP)**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義
@@ -1203,7 +1203,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
             latest_tp_str = f"{ev['tp']:.2f} ({pct_str(ev['tp'], last_close)})"
             latest_risk_tag = ev.get('risk_tag', '結構風控')
 
-    # ── 10. 產生與 Pine Script 100% 同步的「市場狀態面板」數值解讀 ──
+    # ── 10. 產生與 Pine Script 100% 同步的「市場狀態面板 (24態)」數值解讀 ──
     vol_avg20 = pd.Series(vol_v).rolling(20).mean().iloc[-1]
     use_prev_bar = (high_v[-1] == low_v[-1]) or (not pd.isna(vol_avg20) and vol_avg20 > 0 and vol_v[-1] < vol_avg20 * 0.15)
     p_idx = -2 if (use_prev_bar and n >= 2) else -1
@@ -1218,7 +1218,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
     vol_ratio = (p_vol / p_vol_avg) if (p_vol_avg and p_vol_avg > 0) else 1.0
     vol_state = "🔥 爆量" if vol_ratio > 1.5 else ("❄️ 縮量" if vol_ratio < 0.7 else "⚪ 正常")
 
-    # 纏論 × 短線 SMC 16 態解讀
+    # 纏論 6 買賣點 × 短線 SMC 4 態 = 24 態核心矩陣 (外加盤整 4 態保底)
     last_bs_cls = sg_arr[-1]['cls'] if len(sg_arr) > 0 else 0
     last_bs_is_long = sg_arr[-1]['isLong'] if len(sg_arr) > 0 else False
     smc_inter_bull = (internal_trend == 1)
@@ -1298,7 +1298,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
     bear_zones = [z for z in all_zones if z['bias'] == -1]
 
     if bull_zones:
-        # 找上緣最接近當前收盤價的多頭支撐框
         bull_zones.sort(key=lambda z: abs(last_close - z['top']))
         bz = bull_zones[0]
         nearest_sup_dist = ((last_close - bz['top']) / last_close) * 100.0
@@ -1306,11 +1305,15 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
         nearest_sup_str = f"{bz['type_name']} [{bz['bot']:.2f}~{bz['top']:.2f}]{in_zone}"
 
     if bear_zones:
-        bear_zones.sort(key=lambda z: abs(bz_top := z['bot'] - last_close))
+        bear_zones.sort(key=lambda z: abs(z['bot'] - last_close))
         rz = bear_zones[0]
         nearest_res_dist = ((rz['bot'] - last_close) / last_close) * 100.0
         in_zone = " (⚡進入框內!)" if (rz['bot'] <= last_close <= rz['top']) else f" ({nearest_res_dist:+.2f}%)"
         nearest_res_str = f"{rz['type_name']} [{rz['bot']:.2f}~{rz['top']:.2f}]{in_zone}"
+
+    # ── 12. 額外提取「最近 2 根 K 棒 (bar_i >= n - 2)」剛觸發的即時訊號，供風向標「準備抄底/逃頂」使用 ──
+    k2_events = [ev['sig_str'] for ev in all_valid_events if ev['bar_i'] >= n - 2]
+    k2_events = list(dict.fromkeys(k2_events))
 
     return {
         "最新收盤價": last_close,
@@ -1324,6 +1327,13 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
         "WVF恐慌值": p_wvf,
         "WVF狀態": wvf_status,
         "纏論SMC解讀": chan_smc_panel_txt,
+        "SMC_State_ID": smc_state_id,
+        "SMC_Tag_UI": smc_tag_ui,
+        "Chan_Tag": chan_tag,
+        "Chan_Action_Base": action_txt,
+        "Chan_Is_Long": last_bs_is_long,
+        "Chan_Cls": last_bs_cls,
+        "K2_Signals": k2_events,
         "觸發指標通知": " ｜ ".join(latest_signals) if latest_signals else "",
         "訊號數量": len(latest_signals),
         "建議止損(SL)": latest_sl_str,
@@ -1465,9 +1475,9 @@ if scan_btn:
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
 
     # ────────────────────────────────────────────────────────────────────────
-    # 第一區：大盤 12 象限風向標 × 纏論/SMC 16 態即時戰情卡
+    # 第一區：大盤 24 態纏論×SMC 結構矩陣 ＋ 近14K動能修正 ＋ 近2K準備抄底雷達
     # ────────────────────────────────────────────────────────────────────────
-    st.subheader(f"🚥 大盤環境與核心板塊風向標 ({selected_tf_label} ｜ 近 14 根 K 棒動能矩陣)")
+    st.subheader(f"🚥 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ({selected_tf_label})")
 
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
     bull_kws_map = {
@@ -1481,22 +1491,11 @@ if scan_btn:
         "多頭陷阱": "多頭陷阱", "空頭 CHOCH": "空頭CHOCH", "空頭 BOS": "空頭BOS", "纏論賣點": "纏論賣點"
     }
 
-    advices_matrix = {
-        ("🟢多頭BOS", "多"): ("🔥 主升浪爆發", "雙多共振，逢低做多，多單抱牢", "bull"),
-        ("🟢多頭BOS", "空"): ("⚠️ 多頭遇壓", "主升浪遇阻 / 動能背離，防守或減碼", "warn"),
-        ("🟢多頭BOS", "平"): ("🟢 高位震盪", "多頭趨勢延續，蓄勢待發", "bull"),
-        ("🟢多頭CHOCH", "多"): ("🔥 右側起漲", "結構扭轉且動能共振，積極建倉", "bull"),
-        ("🟢多頭CHOCH", "空"): ("⚠️ 反彈遇阻", "初升浪遇阻，防二次探底", "warn"),
-        ("🟢多頭CHOCH", "平"): ("🟢 底部築底", "結構已轉多，留意突破方向", "bull"),
-        ("🔴空頭CHOCH", "多"): ("⚠️ 跌深反抽", "留意空頭回馬槍 (誘多)，搶短慎行", "warn"),
-        ("🔴空頭CHOCH", "空"): ("🔴 頂部確立", "右側做頭確認，逢高逃頂 / 順勢建空", "bear"),
-        ("🔴空頭CHOCH", "平"): ("🔴 頂部震盪", "高位結構破壞，防守觀望為主", "bear"),
-        ("🔴空頭BOS", "多"): ("⚠️ 探底背離", "主跌段動能竭盡，摸底需嚴設停損", "warn"),
-        ("🔴空頭BOS", "空"): ("🔴 主跌浪崩盤", "雙空共振，空單抱牢 / 順勢高空", "bear"),
-        ("🔴空頭BOS", "平"): ("🔴 低位磨底", "跌勢中繼整理，尚未明確見底", "bear"),
-    }
+    # 近 2K 抄底 / 右側買進關鍵字 vs 逃頂 / 做空關鍵字
+    bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認", "纏論買點"]
+    top_escape_kws = ["頂部預警", "WT 死叉", "多頭陷阱", "中樞共振 Sell", "OB共振壓力", "中樞 Sell", "OB壓力確認", "纏論賣點"]
 
-    with st.spinner("🔄 正在同步計算大盤 12 象限矩陣與中樞/共振支撐區..."):
+    with st.spinner("🔄 正在運算大盤 24 態纏論×SMC 矩陣與近 2K 閃電抄底訊號..."):
         b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
         b_cols = st.columns(len(barometer_tickers))
 
@@ -1530,20 +1529,64 @@ if scan_btn:
                                             bear_detail[name] = bear_detail.get(name, 0) + 1
                                             break
 
-                        sig_dir = "空" if bear_count > bull_count else ("多" if bull_count > bear_count else "平")
-                        smc_trend = b_res["SMC_Trend"] if b_res else 0
-                        smc_tag = b_res["SMC_Tag"] if b_res else "BOS"
+                        # ── 1. 取出 24 態結構基底 (SMC 4態 × 纏論 6買賣點) ──
+                        smc_id = b_res["SMC_State_ID"]       # 1:綠BOS, 2:綠CHOCH, 3:紅CHOCH, 4:紅BOS
+                        smc_ui = b_res["SMC_Tag_UI"]
+                        chan_tag = b_res["Chan_Tag"]         # 一買/二買/三買/一賣/二賣/三賣/盤整
+                        base_advice = b_res["Chan_Action_Base"]
+                        chan_long = b_res["Chan_Is_Long"]
+                        chan_cls = b_res["Chan_Cls"]
 
-                        if smc_trend == 1:
-                            smc_state = "🟢多頭CHOCH" if smc_tag == "CHOCH" else "🟢多頭BOS"
-                        elif smc_trend == -1:
-                            smc_state = "🔴空頭CHOCH" if smc_tag == "CHOCH" else "🔴空頭BOS"
+                        # 判定結構基底偏多或偏空
+                        struct_is_bull = (smc_id in [1, 2] and (chan_long or chan_cls == 0)) or (smc_id in [3, 4] and chan_long and chan_cls in [1, 2])
+                        struct_is_bear = (smc_id in [3, 4] and (not chan_long)) or (smc_id in [1, 2] and (not chan_long and chan_cls != 0))
+
+                        # ── 2. 結合「近 14K 多空計分」進行動態戰術修正 ──
+                        if bear_count > bull_count:
+                            mom_14k_str = f"近14K空偏多 (空{bear_count}>多{bull_count})"
+                            if struct_is_bull:
+                                tactical_tag = "⚠️ 謹慎做多 (等回踩)"
+                                style_cls = "warn"
+                            else:
+                                tactical_tag = "🔴 順勢做空 / 空單抱牢"
+                                style_cls = "bear"
+                        elif bull_count > bear_count:
+                            mom_14k_str = f"近14K多偏空 (多{bull_count}>空{bear_count})"
+                            if struct_is_bull:
+                                tactical_tag = "🔥 積極做多 / 順勢抱牢"
+                                style_cls = "bull"
+                            else:
+                                tactical_tag = "⚠️ 謹慎做空 (防反抽)"
+                                style_cls = "warn"
                         else:
-                            smc_state = "⚪震盪"
+                            mom_14k_str = f"近14K多空均衡 ({bull_count}:{bear_count})"
+                            tactical_tag = "🟢 偏多震盪" if struct_is_bull else ("🔴 偏空震盪" if struct_is_bear else "⚪ 區間觀望")
+                            style_cls = "bull" if struct_is_bull else ("bear" if struct_is_bear else "warn")
 
-                        title_prefix, action_advice, style_cls = advices_matrix.get(
-                            (smc_state, sig_dir), ("⚪ 震盪整理", "無明顯結構與動能", "warn")
-                        )
+                        # ── 3. 檢查「近 2K 即時閃電訊號」：直接提示「準備抄底」或「準備逃頂」 ──
+                        k2_sigs = b_res.get("K2_Signals", [])
+                        k2_bull_hits = [s.split("(")[0] for s in k2_sigs if any(k in s for k in bottom_dip_kws)]
+                        k2_bear_hits = [s.split("(")[0] for s in k2_sigs if any(k in s for k in top_escape_kws)]
+
+                        k2_banner_html = ""
+                        if k2_bull_hits:
+                            hit_names = " + ".join(k2_bull_hits[:2])
+                            dip_word = "⚡ 準備抄底！" if (smc_id in [3, 4] or any("抄底" in x or "超賣" in x or "Bottom" in x or "陷阱" in x for x in k2_bull_hits)) else "⚡ 右側回踩買點！"
+                            k2_banner_html = f"""
+                            <div style="background:rgba(0,230,118,0.22);border:1px solid #00e676;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#00e676;font-weight:700;">
+                                {dip_word} 近2K觸發：{hit_names}
+                            </div>
+                            """
+                            style_cls = "bull"
+                        elif k2_bear_hits:
+                            hit_names = " + ".join(k2_bear_hits[:2])
+                            k2_banner_html = f"""
+                            <div style="background:rgba(255,82,82,0.22);border:1px solid #ff5252;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#ff5252;font-weight:700;">
+                                🚨 準備逃頂/防守！ 近2K觸發：{hit_names}
+                            </div>
+                            """
+                            if style_cls == "bull":
+                                style_cls = "warn"
 
                         px_val = b_res["最新收盤價"]
                         chg_val = b_res["漲跌幅"]
@@ -1555,18 +1598,19 @@ if scan_btn:
                                 <span>{b_tick}</span>
                                 <span class="baro-price">{px_val:.2f} <span style="color:{chg_col};font-size:0.82rem;">({chg_val:+.2f}%)</span></span>
                             </div>
-                            <span class="baro-badge badge-{style_cls}">{title_prefix} ｜ 多{bull_count} : 空{bear_count}</span>
-                            <div class="baro-advice">{action_advice}</div>
+                            {k2_banner_html}
+                            <span class="baro-badge badge-{style_cls}">【{smc_ui} + {chan_tag}】{tactical_tag}</span>
+                            <div class="baro-advice">24態劇本：{base_advice}</div>
                             <div class="baro-sub">
-                                • 面板: <b>{b_res['纏論SMC解讀']}</b><br>
-                                • 動能: WT <span class="metric-pill">{b_res['WT快線']:.1f}</span> ｜ RSI <span class="metric-pill">{b_res['平均RSI']:.1f}</span> ({b_res['RSI狀態']})<br>
+                                • 14K動能: <b>{mom_14k_str}</b><br>
+                                • 指標: WT <span class="metric-pill">{b_res['WT快線']:.1f}</span> ｜ RSI <span class="metric-pill">{b_res['平均RSI']:.1f}</span> ({b_res['RSI狀態']})<br>
                                 • 支撐: {b_res['最近支撐區']}<br>
                                 • 壓力: {b_res['最近壓力區']}
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                        with st.expander("🕒 近 14K 訊號明細"):
+                        with st.expander("🕒 近 14K 訊號計分與時間軸"):
                             if bull_detail:
                                 st.caption("🟢 **多方計分：** " + "、".join([f"{k}({v})" for k, v in bull_detail.items()]))
                             if bear_detail:
@@ -1799,7 +1843,7 @@ if scan_btn:
             )
 
     with tab3:
-        st.markdown("💡 **實戰用法：** 100% 對應 TradingView 圖表右上角的 **《市場狀態指標面板》**，一次檢視所有自選股的 **纏論×SMC 16 態操作建議、WaveTrend、RSI 面積狀態与 WVF 恐慌度**。")
+        st.markdown("💡 **實戰用法：** 100% 對應 TradingView 圖表右上角的 **《市場狀態指標面板》**，一次檢視所有自選股的 **纏論×SMC 24 態操作建議、WaveTrend、RSI 面積狀態與 WVF 恐慌度**。")
         if all_scanned_rows:
             df_panel = pd.DataFrame(all_scanned_rows)
             df_panel = df_panel.sort_values(by=['Priority', 'Raw_Volume'], ascending=[False, False])
