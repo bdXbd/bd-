@@ -1356,17 +1356,39 @@ with st.sidebar.expander("🛠️ 指標細節對齊設定 (鏡像 Pine Script)"
     scan_us_indices = st.checkbox("🌍 擴充掃描美股三大指數成分股 (~500檔)", value=bool(user_config.get("scan_us_indices", False)))
 
 st.sidebar.subheader("⚡ 戰術濾網與訊號過濾")
-preset_choice = st.sidebar.selectbox("快速套用戰術濾網：", list(PRESET_FILTERS.keys()), index=0)
 
-if PRESET_FILTERS[preset_choice] is not None:
-    default_sigs = PRESET_FILTERS[preset_choice]
-else:
-    default_sigs = [s for s in user_config.get("target_signals", ALL_SIG_TYPES) if s in ALL_SIG_TYPES]
+# 初始化 Session State，確保手動打叉 (×) 後絕對不會被預設清單蓋掉
+if "ms_target_signals" not in st.session_state:
+    saved_sigs = [s for s in user_config.get("target_signals", ALL_SIG_TYPES) if s in ALL_SIG_TYPES]
+    st.session_state.ms_target_signals = saved_sigs
+
+def on_preset_change():
+    choice = st.session_state.preset_selector
+    if PRESET_FILTERS.get(choice) is not None:
+        st.session_state.ms_target_signals = list(PRESET_FILTERS[choice])
+
+st.sidebar.selectbox(
+    "快速套用戰術濾網 (切換後可直接下方微調打叉)：",
+    ["🛠️ 自訂勾選訊號 (記憶模式)"] + [k for k in PRESET_FILTERS.keys() if k != "🛠️ 自訂勾選訊號"],
+    index=0,
+    key="preset_selector",
+    on_change=on_preset_change
+)
+
+c_sel1, c_sel2 = st.sidebar.columns(2)
+with c_sel1:
+    if st.button("✅ 全選所有訊號", use_container_width=True):
+        st.session_state.ms_target_signals = list(ALL_SIG_TYPES)
+        st.rerun()
+with c_sel2:
+    if st.button("🗑️ 清空所有訊號", use_container_width=True):
+        st.session_state.ms_target_signals = []
+        st.rerun()
 
 target_signals = st.sidebar.multiselect(
-    "保留含有以下訊號的標的 (清空=顯示全部)：",
-    ALL_SIG_TYPES,
-    default=default_sigs
+    "保留含有以下訊號的標的 (可自由打叉 × 移除)：",
+    options=ALL_SIG_TYPES,
+    key="ms_target_signals"
 )
 
 with st.sidebar.expander("📊 基本面估值過濾 (選配)", expanded=False):
@@ -1705,9 +1727,11 @@ if scan_btn:
         if not should_add:
             continue
 
-        if not target_signals or r["觸發指標通知"] == "無技術訊號":
-            triggered_rows.append(r)
-        else:
+        # 若僅看基本面 (模式4) 且無技術訊號則放行；否則嚴格依照多選框內保留的訊號過濾
+        if r["觸發指標通知"] == "無技術訊號":
+            if not scan_mode.startswith("1"):
+                triggered_rows.append(r)
+        elif len(target_signals) > 0:
             sigs = r["觸發指標通知"].split(" ｜ ")
             if any(any(target in s for target in target_signals) for s in sigs):
                 triggered_rows.append(r)
