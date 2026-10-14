@@ -21,776 +21,6 @@ st.set_page_config(
 
 st.markdown(
     "<style>"
-    ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
-    ".baro-bull { border-left: 5px solid #00e676; }"
-    ".baro-bear { border-left: 5px solid #ff5252; }"
-    ".baro-warn { border-left: 5px solid #ffca28; }"
-    ".baro-title { font-size: 1.05rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }"
-    ".baro-price { font-size: 0.90rem; font-family: monospace; color: #00e5ff; }"
-    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 5px; }"
-    ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
-    ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
-    ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
-    ".baro-advice { font-size: 0.84rem; font-weight: 700; color: #ffffff; margin-bottom: 5px; }"
-    ".baro-sub { font-size: 0.75rem; color: #9ba2b0; line-height: 1.45; }"
-    ".metric-pill { background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; font-family: monospace; color: #ffd600; }"
-    "</style>",
-    unsafe_allow_html=True
-)
-
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.3")
-st.caption("精簡極速版：**24 態纏論×SMC 大盤風向標 (含近2K閃電抄底)** × **OB/中樞共振回踩** × **嚴格成交量排序** × **切換過濾器 0 秒即時更新**")
-
-# ════════════════════════════════════════════════════════════════════════════
-# 訊號清單與預設戰術組合定義
-# ════════════════════════════════════════════════════════════════════════════
-CONFIG_FILE = "scanner_config.json"
-FAV_FILE = "favorites.txt"
-
-ALL_SIG_TYPES = [
-    # 結構回踩與共振確認 (核心右側訊號)
-    "🌟【中樞共振 Buy】", "🌟【中樞共振 Sell】",
-    "🟪【OB共振支撐】", "🟪【OB共振壓力】",
-    "🟠【中樞 Buy】", "🟠【中樞 Sell】",
-    "🟩【OB支撐確認】", "🟥【OB壓力確認】",
-    # WaveTrend 動能與抄底逃頂
-    "🟢【恐慌抄底】", "🟡【Market Bottom】", "🟣【極度超賣】", "🟪【超賣預警】",
-    "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    # 反轉陷阱通道
-    "🛡️【空頭陷阱】", "⚠️【多頭陷阱】",
-    # SMC 結構突破與纏論買賣點
-    "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
-    "💠【纏論買點】", "💠【纏論賣點】"
-]
-
-PRESET_FILTERS = {
-    "🛠️ 自訂勾選訊號 (記憶模式)": None,
-    "🔥 全部訊號 (全開)": ALL_SIG_TYPES,
-    "💎 右側回踩做多 (中樞/共振/OB支撐 + Market Bottom)": [
-        "🌟【中樞共振 Buy】", "🟪【OB共振支撐】", "🟠【中樞 Buy】", "🟩【OB支撐確認】", "🟡【Market Bottom】"
-    ],
-    "🌟 頂級共振狙擊 (僅看中樞共振 + OB共振)": [
-        "🌟【中樞共振 Buy】", "🌟【中樞共振 Sell】", "🟪【OB共振支撐】", "🟪【OB共振壓力】"
-    ],
-    "🟢 左側恐慌抄底 (恐慌抄底 + 極度超賣 + 空頭陷阱 + 纏論買點)": [
-        "🟢【恐慌抄底】", "🟣【極度超賣】", "🛡️【空頭陷阱】", "🟡【Market Bottom】", "💠【纏論買點】"
-    ],
-    "🔴 逃頂與做空警訊 (頂部預警 + WT死叉 + 壓力受阻 + 多頭陷阱)": [
-        "🌟【中樞共振 Sell】", "🟪【OB共振壓力】", "🟠【中樞 Sell】", "🟥【OB壓力確認】",
-        "⚠️【頂部預警】", "🟠【WT 死叉】", "⚠️【多頭陷阱】", "💠【纏論賣點】"
-    ]
-}
-
-def load_config():
-    config = {
-        "favorites": "SPY, QQQ, SOXX, NVDA, TSLA, AAPL, MSFT, AMD, TSM, 2330.TW, 0050.TW, 00631L.TW, ^TWII, EWT, NQ=F, BTC-USD",
-        "scan_mode": "1. 僅看技術指標 (預設)",
-        "max_peg": 1.0,
-        "max_pe": 0.0,
-        "max_pb": 0.0,
-        "scan_us_indices": False,
-        "selected_tf_label": "4小時K (TV標準)",
-        "recent_k": 2,
-        "scan_days": 90,
-        "strict_confirm": False,
-        "show_swing_ob": False,
-        "include_chan_bs": False,
-        "show_sl_tp": True,
-        "fav_first": True,
-        "ob_rr": 2.0,
-        "target_signals": ALL_SIG_TYPES
-    }
-
-    if os.path.exists(FAV_FILE):
-        try:
-            with open(FAV_FILE, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content and not content.startswith("{"):
-                    config["favorites"] = content
-        except Exception:
-            pass
-
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                saved_config = json.load(f)
-                config.update(saved_config)
-        except Exception:
-            pass
-
-    return config
-
-def save_config(config_dict):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config_dict, f, ensure_ascii=False, indent=4)
-
-# ════════════════════════════════════════════════════════════════════════════
-# 數據獲取與 TradingView 4H 時框精準重採樣
-# ════════════════════════════════════════════════════════════════════════════
-@st.cache_data(ttl=3600)
-def get_us_indices():
-    def fetch_wiki(url):
-        try:
-            storage_options = {'User-Agent': 'Mozilla/5.0'}
-            dfs = pd.read_html(url, storage_options=storage_options)
-            for df in dfs:
-                if 'Symbol' in df.columns:
-                    return df['Symbol'].str.replace('.', '-', regex=False).tolist()
-                if 'Ticker' in df.columns:
-                    return df['Ticker'].str.replace('.', '-', regex=False).tolist()
-        except Exception:
-            pass
-        return []
-
-    sp500 = fetch_wiki("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
-    ndx   = fetch_wiki("https://en.wikipedia.org/wiki/Nasdaq-100")
-    sox   = fetch_wiki("https://en.wikipedia.org/wiki/PHLX_Semiconductor_Sector")
-    combined = list(dict.fromkeys([t for t in (sp500 + ndx + sox) if isinstance(t, str) and len(t) <= 7]))
-
-    if len(combined) < 100:
-        backup = ["SPY", "QQQ", "DIA", "IWM", "SOXX", "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AMD", "TSM", "AVGO", "NFLX", "BTC-USD"]
-        return backup, [], [], False
-    return combined, ndx, sox, True
-
-def rma(series, length):
-    return series.ewm(alpha=1.0 / length, adjust=False).mean()
-
-def calc_robust_avg_vol(df_raw):
-    """穩健計算日均成交量，徹底避免時區或索引格式問題導致成交量歸零"""
-    if 'Volume' not in df_raw.columns or len(df_raw) == 0:
-        return 0.0
-    try:
-        idx_dates = pd.to_datetime(df_raw.index).date
-        daily_vols = df_raw['Volume'].groupby(idx_dates).sum()
-        non_zero = daily_vols[daily_vols > 0]
-        if len(non_zero) > 0:
-            return float(non_zero.tail(20).mean())
-        return float(df_raw['Volume'].tail(20).mean())
-    except Exception:
-        return float(df_raw['Volume'].tail(20).mean()) if len(df_raw) > 0 else 0.0
-
-def resample_to_tv_4h(df_1h, ticker=""):
-    df = df_1h.copy()
-    t_up = str(ticker).upper()
-
-    if "-USD" in t_up or "=F" in t_up:
-        if df.index.tz is not None:
-            df.index = df.index.tz_convert('UTC')
-        else:
-            df.index = pd.to_datetime(df.index).tz_localize('UTC')
-        df_4h = df.resample('4h', closed='left', label='left').agg({
-            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-        }).dropna(subset=['Close'])
-        return df_4h.sort_index()
-
-    if t_up.endswith(".TW") or t_up.endswith(".TWO") or t_up == "^TWII":
-        if df.index.tz is not None:
-            df.index = df.index.tz_convert('Asia/Taipei')
-        else:
-            df.index = pd.to_datetime(df.index).tz_localize('UTC').tz_convert('Asia/Taipei')
-        date_group = df.index.date
-        session_group = np.where(df.index.hour < 11, 0, 1)
-        df_4h = df.groupby([date_group, session_group]).agg({
-            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-        }).dropna(subset=['Close'])
-        df_4h.index = [pd.Timestamp(f"{d} {'09:00' if s==0 else '11:00'}").tz_localize('Asia/Taipei') for d, s in df_4h.index]
-        return df_4h.sort_index()
-
-    if df.index.tz is not None:
-        df.index = df.index.tz_convert('America/New_York')
-    else:
-        df.index = pd.to_datetime(df.index).tz_localize('UTC').tz_convert('America/New_York')
-    date_group = df.index.date
-    session_group = np.where(df.index.hour < 13, 0, 1)
-    df_4h = df.groupby([date_group, session_group]).agg({
-        'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-    }).dropna(subset=['Close'])
-    df_4h.index = [pd.Timestamp(f"{d} {'09:30' if s==0 else '13:30'}").tz_localize('America/New_York') for d, s in df_4h.index]
-    return df_4h.sort_index()
-
-# ════════════════════════════════════════════════════════════════════════════
-# 纏論核心引擎 (100% 鏡像移植 Pine Script 第二部分)
-# ════════════════════════════════════════════════════════════════════════════
-def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
-    n = len(close_v)
-    if n < 8:
-        return [], [], []
-
-    mk_arr = []
-    direction = 1
-    for i in range(n):
-        hi, lo = float(high_v[i]), float(low_v[i])
-        if len(mk_arr) == 0:
-            mk_arr.append({'high': hi, 'low': lo, 'hIdx': i, 'lIdx': i})
-        else:
-            last = mk_arr[-1]
-            incl = (hi <= last['high'] and lo >= last['low']) or (hi >= last['high'] and lo <= last['low'])
-            if incl:
-                if direction > 0:
-                    if hi > last['high']:
-                        last['high'], last['hIdx'] = hi, i
-                    if lo > last['low']:
-                        last['low'], last['lIdx'] = lo, i
-                else:
-                    if hi < last['high']:
-                        last['high'], last['hIdx'] = hi, i
-                    if lo < last['low']:
-                        last['low'], last['lIdx'] = lo, i
-            else:
-                direction = 1 if hi > last['high'] else -1
-                mk_arr.append({'high': hi, 'low': lo, 'hIdx': i, 'lIdx': i})
-
-    fr_arr = []
-    if len(mk_arr) >= 3:
-        for k in range(1, len(mk_arr) - 1):
-            a, c, d = mk_arr[k - 1], mk_arr[k], mk_arr[k + 1]
-            if c['high'] > a['high'] and c['high'] > d['high'] and c['low'] > a['low'] and c['low'] > d['low']:
-                fr_arr.append({'typ': 1, 'mIdx': k, 'price': c['high'], 'pos': c['hIdx']})
-            elif c['low'] < a['low'] and c['low'] < d['low'] and c['high'] < a['high'] and c['high'] < d['high']:
-                fr_arr.append({'typ': -1, 'mIdx': k, 'price': c['low'], 'pos': c['lIdx']})
-
-    rs_arr = []
-    for cur in fr_arr:
-        keep = True
-        while len(rs_arr) > 0:
-            last_f = rs_arr[-1]
-            if last_f['typ'] == cur['typ']:
-                better = (cur['price'] > last_f['price']) if cur['typ'] > 0 else (cur['price'] < last_f['price'])
-                if better:
-                    rs_arr.pop()
-                    continue
-                else:
-                    keep = False
-                    break
-            if abs(cur['mIdx'] - last_f['mIdx']) >= min_gap:
-                break
-            else:
-                keep = False
-                break
-        if keep:
-            rs_arr.append(cur)
-
-    bi_arr = []
-    if len(rs_arr) >= 2:
-        for i in range(len(rs_arr) - 1):
-            a, b = rs_arr[i], rs_arr[i + 1]
-            bi_arr.append({
-                'b0': a['pos'], 'p0': a['price'],
-                'b1': b['pos'], 'p1': b['price'],
-                'up': b['price'] > a['price'],
-                'hi': max(a['price'], b['price']),
-                'lo': min(a['price'], b['price'])
-            })
-    if len(bi_arr) > 79:
-        bi_arr = bi_arr[-79:]
-
-    zs_arr = []
-    nb = len(bi_arr)
-    i2 = 0
-    while i2 <= nb - 3:
-        b1, b2, b3 = bi_arr[i2], bi_arr[i2 + 1], bi_arr[i2 + 2]
-        zg = min(b1['hi'], b2['hi'])
-        zd = max(b1['lo'], b2['lo'])
-        if zd < zg and b3['lo'] < zg and b3['hi'] > zd:
-            en = i2 + 2
-            j = i2 + 3
-            while j < nb:
-                bj = bi_arr[j]
-                if bj['lo'] < zg and bj['hi'] > zd:
-                    en = j
-                    j += 1
-                else:
-                    break
-            zs_arr.append({'ZG': zg, 'ZD': zd, 'startBi': i2, 'endBi': en, 'dir': 1 if b1['up'] else -1})
-            i2 = en + 1
-        else:
-            i2 += 1
-    if len(zs_arr) > 16:
-        zs_arr = zs_arr[-16:]
-
-    def f_area(idx_a, idx_b):
-        s_idx, e_idx = max(0, idx_a), min(n - 1, idx_b)
-        return float(np.sum(np.abs(hist_v[s_idx : e_idx + 1]))) if e_idx >= s_idx else 0.0
-
-    def f_leg(zs0, ze, up_dir):
-        best_a, best_i = -1.0, -1
-        for idx_bi in range(zs0, ze + 1):
-            if 0 <= idx_bi < len(bi_arr):
-                b = bi_arr[idx_bi]
-                if b['up'] == up_dir:
-                    area = f_area(b['b0'], b['b1'])
-                    if area > best_a:
-                        best_a, best_i = area, idx_bi
-        return best_a, best_i
-
-    sg_arr = []
-    if len(zs_arr) >= 2:
-        for k in range(1, len(zs_arr)):
-            A, Cz = zs_arr[k - 1], zs_arr[k]
-            if Cz['ZG'] < A['ZD']:
-                aA, iA = f_leg(A['startBi'], A['endBi'], False)
-                aC, iC = f_leg(Cz['startBi'], Cz['endBi'], False)
-                if iA >= 0 and iC >= 0 and aC < aA * 0.9:
-                    bC = bi_arr[iC]
-                    sg_arr.append({'pos': bC['b1'], 'price': bC['p1'], 'isLong': True, 'label': '1買', 'cls': 1, 'refP': Cz['ZD']})
-                    if iC + 2 < len(bi_arr):
-                        up1, back = bi_arr[iC + 1], bi_arr[iC + 2]
-                        if up1['up'] and not back['up'] and up1['p1'] > Cz['ZG'] and back['p1'] > bC['p1']:
-                            sg_arr.append({'pos': back['b1'], 'price': back['p1'], 'isLong': True, 'label': '2買', 'cls': 2, 'refP': bC['p1']})
-            elif Cz['ZD'] > A['ZG']:
-                aA, iA = f_leg(A['startBi'], A['endBi'], True)
-                aC, iC = f_leg(Cz['startBi'], Cz['endBi'], True)
-                if iA >= 0 and iC >= 0 and aC < aA * 0.9:
-                    bC = bi_arr[iC]
-                    sg_arr.append({'pos': bC['b1'], 'price': bC['p1'], 'isLong': False, 'label': '1賣', 'cls': 1, 'refP': Cz['ZG']})
-                    if iC + 2 < len(bi_arr):
-                        dn1, back = bi_arr[iC + 1], bi_arr[iC + 2]
-                        if not dn1['up'] and back['up'] and dn1['p1'] < Cz['ZD'] and back['p1'] < bC['p1']:
-                            sg_arr.append({'pos': back['b1'], 'price': back['p1'], 'isLong': False, 'label': '2賣', 'cls': 2, 'refP': bC['p1']})
-
-    if len(zs_arr) >= 1:
-        for z in zs_arr:
-            if z['endBi'] + 1 < len(bi_arr):
-                brk, hold = bi_arr[z['endBi']], bi_arr[z['endBi'] + 1]
-                if brk['up'] and brk['p1'] > z['ZG'] and not hold['up'] and hold['p1'] > z['ZG']:
-                    sg_arr.append({'pos': hold['b1'], 'price': hold['p1'], 'isLong': True, 'label': '3買', 'cls': 3, 'refP': z['ZG']})
-                elif not brk['up'] and brk['p1'] < z['ZD'] and hold['up'] and hold['p1'] < z['ZD']:
-                    sg_arr.append({'pos': hold['b1'], 'price': hold['p1'], 'isLong': False, 'label': '3賣', 'cls': 3, 'refP': z['ZD']})
-
-    if len(sg_arr) > 1:
-        dd = []
-        for sg in sg_arr:
-            at = -1
-            for j, d in enumerate(dd):
-                if d['pos'] == sg['pos'] and d['price'] == sg['price'] and d['isLong'] == sg['isLong']:
-                    at = j
-                    break
-            if at < 0:
-                dd.append(sg)
-            elif sg['cls'] > dd[at]['cls']:
-                dd[at] = sg
-        sg_arr = sorted(dd, key=lambda x: x['pos'])[-12:]
-
-    return bi_arr, zs_arr, sg_arr
-
-# ════════════════════════════════════════════════════════════════════════════
-# 完整技術指標掃描引擎 (100% 鏡像 Pine Script V3.8)
-# ════════════════════════════════════════════════════════════════════════════
-def update_active_obs(src_obs, max_obs=5, show_overlap=True):
-    act_obs = []
-    overlapped_origins = set()
-    sz = len(src_obs)
-    if sz == 0:
-        return act_obs, overlapped_origins
-
-    parsed = src_obs[:min(max_obs, sz)]
-    p_sz = len(parsed)
-    is_overlapped = [False] * p_sz
-
-    if show_overlap and p_sz >= 2:
-        for i in range(p_sz - 1):
-            obA = parsed[i]
-            for j in range(i + 1, p_sz):
-                obB = parsed[j]
-                if obA['bias'] == obB['bias']:
-                    inter_top = min(obA['top'], obB['top'])
-                    inter_bot = max(obA['bot'], obB['bot'])
-                    if inter_top > inter_bot:
-                        is_overlapped[i] = True
-                        is_overlapped[j] = True
-                        overlapped_origins.add(obA['ob_idx'])
-                        overlapped_origins.add(obB['ob_idx'])
-                        overlap_start = max(obA['ob_idx'], obB['ob_idx'])
-                        act_obs.append({
-                            'top': inter_top,
-                            'bot': inter_bot,
-                            'ob_idx': overlap_start,
-                            'gen_i': max(obA['gen_i'], obB['gen_i']),
-                            'bias': obA['bias'],
-                            'is_reso': True
-                        })
-
-    for i in range(p_sz):
-        if not is_overlapped[i]:
-            item = parsed[i].copy()
-            item['is_reso'] = False
-            act_obs.append(item)
-
-    return act_obs, overlapped_origins
-
-
-def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, include_chan_bs=False, ob_rr=2.0):
-    if df is None or len(df) < 40:
-        return None
-
-    if len(df) > 1000:
-        df = df.iloc[-1000:].copy()
-
-    close_s, high_s, low_s, open_s = df['Close'], df['High'], df['Low'], df['Open']
-    vol_s = df['Volume'] if 'Volume' in df.columns else pd.Series(0.0, index=df.index)
-
-    high_v = high_s.values.astype(float)
-    low_v = low_s.values.astype(float)
-    close_v = close_s.values.astype(float)
-    open_v = open_s.values.astype(float)
-    vol_v = vol_s.values.astype(float)
-    n = len(df)
-
-    # ── 1. WVF (模擬 VIX) ──
-    h_close_22 = close_s.rolling(window=22).max()
-    wvf = ((h_close_22 - low_s) / h_close_22) * 100.0
-    wvf_avg = wvf.rolling(20).mean()
-    wvf_std = wvf.rolling(20).std(ddof=0)
-    wvf_ext = (wvf >= wvf_avg + 2.0 * wvf_std) | (wvf >= wvf.rolling(50).max() * 0.85)
-
-    # ── 2. RSI 雷達 (10 ~ 20 多週期面積引擎) ──
-    diff = close_s.diff().fillna(0)
-    pos_diff = diff.clip(lower=0)
-    overbuy_count = pd.Series(0.0, index=df.index)
-    oversell_count = pd.Series(0.0, index=df.index)
-    rsi_sum = pd.Series(0.0, index=df.index)
-
-    for l in range(10, 21):
-        den = rma(diff.abs(), l).replace(0, np.nan)
-        rsi_i = (100.0 * (rma(pos_diff, l) / den)).fillna(50.0)
-        rsi_sum += rsi_i
-        overbuy_count += (rsi_i > 70.0).astype(float)
-        oversell_count += (rsi_i < 30.0).astype(float)
-
-    N_rsi = 11.0
-    avg_rsi = rsi_sum / N_rsi
-    per_over = (overbuy_count / N_rsi) * 100.0
-    per_under = 100.0 - (oversell_count / N_rsi) * 100.0
-    buy_rsi_ma, sell_rsi_ma = np.zeros(n), np.zeros(n)
-    buy_rsi_ma[0], sell_rsi_ma[0] = avg_rsi.iloc[0], avg_rsi.iloc[0]
-    ob_r, os_r, avg_v = (overbuy_count / N_rsi).values, (oversell_count / N_rsi).values, avg_rsi.values
-
-    for i in range(1, n):
-        buy_rsi_ma[i] = buy_rsi_ma[i - 1] + ob_r[i] * (avg_v[i] - buy_rsi_ma[i - 1])
-        sell_rsi_ma[i] = sell_rsi_ma[i - 1] + os_r[i] * (avg_v[i] - sell_rsi_ma[i - 1])
-
-    rsi_red_below = (oversell_count > 0.0) & (per_under <= sell_rsi_ma)
-    rsi_green_above = (overbuy_count > 0.0) & (per_over >= buy_rsi_ma)
-    rsi_strong_green = rsi_green_above & (per_over >= 60.0)
-
-    # ── 3. WaveTrend (10, 21, 4) ──
-    wt_ap = (high_s + low_s + close_s) / 3.0
-    wt_esa = wt_ap.ewm(span=10, adjust=False).mean()
-    wt_d = (wt_ap - wt_esa).abs().ewm(span=10, adjust=False).mean().replace(0, 0.0001)
-    wt1 = ((wt_ap - wt_esa) / (0.015 * wt_d)).ewm(span=21, adjust=False).mean()
-    wt2 = wt1.rolling(4).mean()
-
-    # ── 4. 反轉陷阱通道 (EMA 55, ATR 55 * 4.0) ──
-    rt_basis = close_s.ewm(span=55, adjust=False).mean()
-    tr_s = pd.concat([
-        high_s - low_s,
-        (high_s - close_s.shift(1)).abs(),
-        (low_s - close_s.shift(1)).abs()
-    ], axis=1).max(axis=1)
-    rt_vola = rma(tr_s, 55)
-    rt_upper = rt_basis + 4.0 * rt_vola
-    rt_lower = rt_basis - 4.0 * rt_vola
-
-    # ── 5. ATR(14)、ATR(100)、ATR(200) 與 parsedHighs/Lows ──
-    wt_atr_v = rma(tr_s, 14).values
-    rt_atr100_v = rma(tr_s, 100).values
-    atr200_v = rma(tr_s, 200).values
-
-    high_vol = (high_v - low_v) >= (2.0 * atr200_v)
-    parsed_high = np.where(high_vol, low_v, high_v)
-    parsed_low = np.where(high_vol, high_v, low_v)
-
-    # ── 6. MACD (12, 26, 9) ──
-    ema12 = close_s.ewm(span=12, adjust=False).mean()
-    ema26 = close_s.ewm(span=26, adjust=False).mean()
-    macd_line = ema12 - ema26
-    sig_line = macd_line.ewm(span=9, adjust=False).mean()
-    hist_v = (macd_line - sig_line).fillna(0.0).values
-
-    # ── 狀態追蹤變數 ──
-    os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
-    last_ext_os_sl = np.nan
-    mb_fired_in_cycle, vix_in_red_cycle = False, False
-    rt_last_sig, rt_blw_cnt, rt_abv_cnt = -1000, 0, 0
-
-    last_buy_state, last_sell_state = False, False
-
-    int_leg = np.zeros(n, dtype=int)
-    sw_leg = np.zeros(n, dtype=int)
-    ih_val, ih_idx, ih_crossed = np.nan, 0, True
-    il_val, il_idx, il_crossed = np.nan, 0, True
-    sh_val, sh_idx, sh_crossed = np.nan, 0, True
-    sl_val, sl_idx, sl_crossed = np.nan, 0, True
-
-    internal_trend = 0
-    swing_trend = 0
-    last_smc_tag = "BOS"
-
-    internal_obs = []
-    swing_obs = []
-    active_int_obs = []
-    active_sw_obs = []
-
-    ob_buy_events = []
-    ob_sell_events = []
-    other_events = []
-
-    last_wt_ph_idx, last_wt_ph_val, last_wt_ph_price = -1, -float('inf'), -float('inf')
-
-    for i in range(2, n):
-        t_str = df.index[i].strftime('%m/%d %H:%M')
-        c_val = close_v[i]
-        c_p = f"{c_val:.2f}"
-        cur_atr = wt_atr_v[i] if not np.isnan(wt_atr_v[i]) else (high_v[i] - low_v[i])
-
-        # ── A. 更新 SMC 內部與擺動結構樞軸 ──
-        if i >= 5:
-            h_after5 = np.max(high_v[i - 4 : i + 1])
-            l_after5 = np.min(low_v[i - 4 : i + 1])
-            c_leg5 = int_leg[i - 1]
-            if high_v[i - 5] > h_after5:
-                c_leg5 = 0
-            elif low_v[i - 5] < l_after5:
-                c_leg5 = 1
-            int_leg[i] = c_leg5
-
-            if int_leg[i] == 1 and int_leg[i - 1] == 0:
-                il_val, il_idx, il_crossed = low_v[i - 5], i - 5, False
-            elif int_leg[i] == 0 and int_leg[i - 1] == 1:
-                ih_val, ih_idx, ih_crossed = high_v[i - 5], i - 5, False
-        else:
-            int_leg[i] = int_leg[i - 1]
-
-        if i >= 50:
-            h_after50 = np.max(high_v[i - 49 : i + 1])
-            l_after50 = np.min(low_v[i - 49 : i + 1])
-            c_leg50 = sw_leg[i - 1]
-            if high_v[i - 50] > h_after50:
-                c_leg50 = 0
-            elif low_v[i - 50] < l_after50:
-                c_leg50 = 1
-            sw_leg[i] = c_leg50
-
-            if sw_leg[i] == 1 and sw_leg[i - 1] == 0:
-                sl_val, sl_idx, sl_crossed = low_v[i - 50], i - 50, False
-            elif sw_leg[i] == 0 and sw_leg[i - 1] == 1:
-                sh_val, sh_idx, sh_crossed = high_v[i - 50], i - 50, False
-        else:
-            sw_leg[i] = sw_leg[i - 1]
-
-        # ── B. 檢查內部結構突破 ──
-        if not np.isnan(ih_val) and close_v[i] > ih_val and close_v[i - 1] <= ih_val and not ih_crossed and ih_val != sh_val:
-            ih_crossed = True
-            is_choch = (internal_trend == -1)
-            internal_trend = 1
-            last_smc_tag = "CHOCH" if is_choch else "BOS"
-            other_events.append({
-                'bar_i': i,
-                'sig_str': f"🟢【多頭 {last_smc_tag}】({t_str} 破 {ih_val:.2f})",
-                'sl': ih_val - cur_atr * 1.5,
-                'tp': c_val + cur_atr * 3.0
-            })
-            s_idx = max(0, ih_idx)
-            s_slice = parsed_low[s_idx : i]
-            if len(s_slice) > 0:
-                p_idx = s_idx + int(np.argmin(s_slice))
-                internal_obs.insert(0, {
-                    'top': float(parsed_high[p_idx]),
-                    'bot': float(parsed_low[p_idx]),
-                    'ob_idx': p_idx,
-                    'gen_i': i,
-                    'bias': 1
-                })
-                if len(internal_obs) > 100:
-                    internal_obs.pop()
-
-        if not np.isnan(il_val) and close_v[i] < il_val and close_v[i - 1] >= il_val and not il_crossed and il_val != sl_val:
-            il_crossed = True
-            is_choch = (internal_trend == 1)
-            internal_trend = -1
-            last_smc_tag = "CHOCH" if is_choch else "BOS"
-            other_events.append({
-                'bar_i': i,
-                'sig_str': f"🔴【空頭 {last_smc_tag}】({t_str} 破 {il_val:.2f})",
-                'sl': il_val + cur_atr * 1.5,
-                'tp': c_val - cur_atr * 3.0
-            })
-            s_idx = max(0, il_idx)
-            s_slice = parsed_high[s_idx : i]
-            if len(s_slice) > 0:
-                p_idx = s_idx + int(np.argmax(s_slice))
-                internal_obs.insert(0, {
-                    'top': float(parsed_high[p_idx]),
-                    'bot': float(parsed_low[p_idx]),
-                    'ob_idx': p_idx,
-                    'gen_i': i,
-                    'bias': -1
-                })
-                if len(internal_obs) > 100:
-                    internal_obs.pop()
-
-        # ── B2. 檢查擺動結構突破 ──
-        if not np.isnan(sh_val) and close_v[i] > sh_val and close_v[i - 1] <= sh_val and not sh_crossed:
-            sh_crossed = True
-            swing_trend = 1
-            if show_swing_ob:
-                s_idx = max(0, sh_idx)
-                s_slice = parsed_low[s_idx : i]
-                if len(s_slice) > 0:
-                    p_idx = s_idx + int(np.argmin(s_slice))
-                    swing_obs.insert(0, {
-                        'top': float(parsed_high[p_idx]),
-                        'bot': float(parsed_low[p_idx]),
-                        'ob_idx': p_idx,
-                        'gen_i': i,
-                        'bias': 1
-                    })
-                    if len(swing_obs) > 100:
-                        swing_obs.pop()
-
-        if not np.isnan(sl_val) and close_v[i] < sl_val and close_v[i - 1] >= sl_val and not sl_crossed:
-            sl_crossed = True
-            swing_trend = -1
-            if show_swing_ob:
-                s_idx = max(0, sl_idx)
-                s_slice = parsed_high[s_idx : i]
-                if len(s_slice) > 0:
-                    p_idx = s_idx + int(np.argmax(s_slice))
-                    swing_obs.insert(0, {
-                        'top': float(parsed_high[p_idx]),
-                        'bot': float(parsed_low[p_idx]),
-                        'ob_idx': p_idx,
-                        'gen_i': i,
-                        'bias': -1
-                    })
-                    if len(swing_obs) > 100:
-                        swing_obs.pop()
-
-        # ── C. 剃除已失效的 OB ──
-        internal_obs = [
-            ob for ob in internal_obs
-            if not ((ob['bias'] == -1 and high_v[i] > ob['top']) or (ob['bias'] == 1 and low_v[i] < ob['bot']))
-        ]
-        if show_swing_ob:
-            swing_obs = [
-                ob for ob in swing_obs
-                if not ((ob['bias'] == -1 and high_v[i] > ob['top']) or (ob['bias'] == 1 and low_v[i] < ob['bot']))
-            ]
-
-        # ── D. 更新當前有效 OB 與共振重疊 OB ──
-        active_int_obs, _ = update_active_obs(internal_obs, max_obs=5, show_overlap=True)
-        if show_swing_ob:
-            active_sw_obs, _ = update_active_obs(swing_obs, max_obs=5, show_overlap=True)
-
-        # ── E. WaveTrend 與 RSI 雷達動能訊號 ──
-        if wt1.iloc[i] > -60.0:
-            os_ext_trig = False
-            last_ext_os_sl = np.nan
-        if wt1.iloc[i] > -53.0:
-            os_warn_trig = False
-        if wt1.iloc[i] <= 53.0:
-            ob_warn_trig = False
-        if wt1.iloc[i] <= 60.0:
-            wt_dead_trig = False
-
-        is_red_area = per_under.iloc[i] < 100.0
-        was_red_area = per_under.iloc[i - 1] < 100.0
-        if is_red_area and not was_red_area:
-            vix_in_red_cycle = False
-        if is_red_area and wvf_ext.iloc[i]:
-            vix_in_red_cycle = True
-        if is_red_area:
-            mb_fired_in_cycle = False
-
-        size_piv = 5
-        if i >= size_piv * 2:
-            wt_slice = wt1.iloc[i - size_piv * 2 : i + 1].values
-            left_max = np.max(wt_slice[:size_piv])
-            right_max = np.max(wt_slice[size_piv + 1 :])
-            mid_val = wt_slice[size_piv]
-            if mid_val >= left_max and mid_val > right_max:
-                curr_wt_ph_val = mid_val
-                curr_wt_ph_price = high_v[i - size_piv]
-                if last_wt_ph_idx != -1:
-                    bars_since = (i - size_piv) - last_wt_ph_idx
-                    if 5 <= bars_since <= 60:
-                        if curr_wt_ph_price > last_wt_ph_price and curr_wt_ph_val < last_wt_ph_val:
-                            other_events.append({
-                                'bar_i': i,
-                                'sig_str': f"⚠️【頂部預警】({t_str} @ {c_p})",
-                                'sl': c_val + cur_atr * 1.5,
-                                'tp': c_val - cur_atr * 3.0
-                            })
-                last_wt_ph_idx = i - size_piv
-                last_wt_ph_val = curr_wt_ph_val
-                last_wt_ph_price = curr_wt_ph_price
-
-        if (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i - 1] <= wt2.iloc[i - 1]) and (wt1.iloc[i - 1] <= -60.0) and wvf_ext.iloc[i - 1] and rsi_red_below.iloc[i - 1]:
-            other_events.append({
-                'bar_i': i,
-                'sig_str': f"🟢【恐慌抄底】({t_str} @ {c_p})",
-                'sl': c_val - cur_atr * 1.5,
-                'tp': c_val + cur_atr * 3.0
-            })
-
-        if (wt1.iloc[i] <= -60.0) and wvf_ext.iloc[i] and rsi_red_below.iloc[i]:
-            if (not os_ext_trig) or (not np.isnan(last_ext_os_sl) and low_v[i] < last_ext_os_sl):
-                os_ext_trig = True
-                last_ext_os_sl = c_val - (cur_atr * 1.5)
-                other_events.append({
-                    'bar_i': i,
-                    'sig_str': f"🟣【極度超賣】({t_str} @ {c_p})",
-                    'sl': last_ext_os_sl,
-                    'tp': c_val + cur_atr * 3.0
-                })
-
-        wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i - 1] <= wt2.iloc[i - 1])
-        red_is_zero_now = (per_under.iloc[i] == 100.0)
-        red_was_present = per_under.iloc[max(0, i - 3) : i].min() < 100.0
-        if wt_golden_cross_mb and red_is_zero_now and red_was_present and vix_in_red_問題完全抓到了！之前「沒有照成交量排序」有兩個隱藏原因，我已經在下方 **V7.3 精簡極速版** 中徹底修復並優化：
-
-### 🔍 為什麼之前沒有照成交量排序？
-1. **被 `訊號數` 攔胡了：** 上一版寫了 `sort_values(by=['Priority', '訊號數', 'Raw_Volume'])`，導致「觸發 2 個訊號的小型冷門股」會排在「觸發 1 個訊號的 NVDA / 2330」前面。現已改為 **`['Priority', 'Raw_Volume']`（收藏股優先，接著 100% 嚴格依照成交量由大到小排序）**！
-2. **表格顯示的是「文字字串 (`15.2M`, `3.4B`)」：** 如果你在 Streamlit 網頁上直接點擊表頭排序，因為 `"15.2M"` 是文字，電腦會照英文字母排（變成 `900K > 80M > 1.2B` 的亂序）。現在我直接把 `当前成交量` 與 `日均交易量` 綁定底層真實數值（外掛 `format_vol` 單位顯示），並在側邊欄提供 **「排序依據：日均交易量 / 當前K棒成交量」** 切換，怎麼排都不會亂！
-
----
-
-### ✨ V7.3 表格精簡與系統優化亮點
-1. **極致清爽的 6 欄核心主表（告別雜亂）：**
-   * 主表現在只保留最核心的：**`標的代號`、`TV圖表`、`SMC 結構`、`最新收盤價 (含漲跌)`、`當前成交量`、`日均交易量`、`觸發指標通知`**（若有勾選基本面才會動態加上 PEG/PE/PB）。
-   * **「只顯示你有勾選的訊號」：** 以前如果一檔股票同時觸發 `超買預警` 和 `OB支撐確認`，就算你把 `超買預警` 打叉刪掉，表格裡還是會把兩個都印出來。現在 **你打叉刪掉的訊號，在表格的「觸發指標通知」裡也會自動隱藏**，版面乾淨俐落！
-2. **⚡ 掃描結果快取記憶 (`st.session_state.scan_cache`)：**
-   * **超級有感優化！** 以前你只要在左側把某個訊號打叉 (`×`) 或切換戰術濾網，整個畫面就會消失，要重新等好幾十秒下載 K 線。
-   * 現在掃描完一次後，數據會留在記憶體裡——**你在左側隨便打叉 (`×`) 移除訊號、切換戰術濾網，右邊的表格會「0 秒即時刷新過濾」**，不用重新按掃描！
-
----
-
-### 📋 完整 Python 程式碼 (V7.3 精簡極速版 — 全選覆蓋即可)
-
-```python
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import time
-import warnings
-import os
-import json
-
-warnings.filterwarnings("ignore")
-
-# ════════════════════════════════════════════════════════════════════════════
-# 網頁基本設定與自訂 CSS 美化
-# ════════════════════════════════════════════════════════════════════════════
-st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.3",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-st.markdown(
-    "<style>"
     ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 15px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
     ".baro-bull { border-left: 5px solid #00e676; }"
     ".baro-bear { border-left: 5px solid #ff5252; }"
@@ -818,17 +48,13 @@ CONFIG_FILE = "scanner_config.json"
 FAV_FILE = "favorites.txt"
 
 ALL_SIG_TYPES = [
-    # 結構回踩與共振確認 (核心右側訊號)
     "🌟【中樞共振 Buy】", "🌟【中樞共振 Sell】",
     "🟪【OB共振支撐】", "🟪【OB共振壓力】",
     "🟠【中樞 Buy】", "🟠【中樞 Sell】",
     "🟩【OB支撐確認】", "🟥【OB壓力確認】",
-    # WaveTrend 動能與抄底逃頂
     "🟢【恐慌抄底】", "🟡【Market Bottom】", "🟣【極度超賣】", "🟪【超賣預警】",
     "⚠️【頂部預警】", "🟠【WT 死叉】", "🟡【超買預警】",
-    # 反轉陷阱通道
     "🛡️【空頭陷阱】", "⚠️【多頭陷阱】",
-    # SMC 結構突破與纏論買賣點
     "🟢【多頭 CHOCH】", "🟢【多頭 BOS】", "🔴【空頭 CHOCH】", "🔴【空頭 BOS】",
     "💠【纏論買點】", "💠【纏論賣點】"
 ]
@@ -911,9 +137,9 @@ def get_us_indices():
             pass
         return []
 
-    sp500 = fetch_wiki("[https://en.wikipedia.org/wiki/List_of_S%26P_500_companies](https://en.wikipedia.org/wiki/List_of_S%26P_500_companies)")
-    ndx   = fetch_wiki("[https://en.wikipedia.org/wiki/Nasdaq-100](https://en.wikipedia.org/wiki/Nasdaq-100)")
-    sox   = fetch_wiki("[https://en.wikipedia.org/wiki/PHLX_Semiconductor_Sector](https://en.wikipedia.org/wiki/PHLX_Semiconductor_Sector)")
+    sp500 = fetch_wiki("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    ndx   = fetch_wiki("https://en.wikipedia.org/wiki/Nasdaq-100")
+    sox   = fetch_wiki("https://en.wikipedia.org/wiki/PHLX_Semiconductor_Sector")
     combined = list(dict.fromkeys([t for t in (sp500 + ndx + sox) if isinstance(t, str) and len(t) <= 7]))
 
     if len(combined) < 100:
@@ -923,6 +149,20 @@ def get_us_indices():
 
 def rma(series, length):
     return series.ewm(alpha=1.0 / length, adjust=False).mean()
+
+def calc_robust_avg_vol(df_raw):
+    """穩健計算日均成交量，避免時區或索引格式造成歸零"""
+    if 'Volume' not in df_raw.columns or len(df_raw) == 0:
+        return 0.0
+    try:
+        idx_dates = pd.to_datetime(df_raw.index).date
+        daily_vols = df_raw['Volume'].groupby(idx_dates).sum()
+        non_zero = daily_vols[daily_vols > 0]
+        if len(non_zero) > 0:
+            return float(non_zero.tail(20).mean())
+        return float(df_raw['Volume'].tail(20).mean())
+    except Exception:
+        return float(df_raw['Volume'].tail(20).mean()) if len(df_raw) > 0 else 0.0
 
 def resample_to_tv_4h(df_1h, ticker=""):
     df = df_1h.copy()
@@ -966,27 +206,16 @@ def resample_to_tv_4h(df_1h, ticker=""):
 def get_tv_link(ticker):
     t = ticker.replace("⭐ ", "").strip().upper()
     if t == "^TWII":
-        return "[https://www.tradingview.com/chart/?symbol=TWSE%3ATAIEX](https://www.tradingview.com/chart/?symbol=TWSE%3ATAIEX)"
+        return "https://www.tradingview.com/chart/?symbol=TWSE%3ATAIEX"
     if t.endswith(".TW"):
-        return f"[https://www.tradingview.com/chart/?symbol=TWSE%3A](https://www.tradingview.com/chart/?symbol=TWSE%3A){t.replace('.TW', '')}"
+        return f"https://www.tradingview.com/chart/?symbol=TWSE%3A{t.replace('.TW', '')}"
     if t.endswith(".TWO"):
-        return f"[https://www.tradingview.com/chart/?symbol=TPEX%3A](https://www.tradingview.com/chart/?symbol=TPEX%3A){t.replace('.TWO', '')}"
+        return f"https://www.tradingview.com/chart/?symbol=TPEX%3A{t.replace('.TWO', '')}"
     if t == "BTC-USD":
-        return "[https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT](https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT)"
+        return "https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT"
     if t.endswith("-USD"):
-        return f"[https://www.tradingview.com/chart/?symbol=BINANCE%3A](https://www.tradingview.com/chart/?symbol=BINANCE%3A){t.replace('-USD', '')}USDT"
-    return f"[https://www.tradingview.com/chart/?symbol=](https://www.tradingview.com/chart/?symbol=){t}"
-
-def format_vol(val):
-    if val == 0 or pd.isna(val):
-        return "N/A"
-    if val >= 1e9:
-        return f"{val / 1e9:.2f} B"
-    if val >= 1e6:
-        return f"{val / 1e6:.2f} M"
-    if val >= 1e3:
-        return f"{val / 1e3:.2f} K"
-    return f"{val:.0f}"
+        return f"https://www.tradingview.com/chart/?symbol=BINANCE%3A{t.replace('-USD', '')}USDT"
+    return f"https://www.tradingview.com/chart/?symbol={t}"
 
 # ════════════════════════════════════════════════════════════════════════════
 # 纏論核心引擎 (100% 鏡像移植 Pine Script 第二部分)
@@ -1812,7 +1041,6 @@ with col_s2:
     default_days = max(20, min(int(user_config.get("scan_days", 90)), max_days))
     scan_days = st.number_input("歷史天數", min_value=20, max_value=max_days, value=default_days)
 
-# 排序設定：解決成交量排序問題
 sort_opts = ["日均交易量 (推薦)", "當前K棒成交量"]
 sort_idx = 0 if user_config.get("vol_sort_by", "日均交易量 (推薦)") == "日均交易量 (推薦)" else 1
 vol_sort_by = st.sidebar.radio("📊 表格成交量排序依據 (由大到小)：", sort_opts, index=sort_idx, horizontal=True)
@@ -1837,7 +1065,6 @@ with st.sidebar.expander("🛠️ 進階與全市場擴充設定", expanded=Fals
     max_pe = st.number_input("本益比 (P/E) 低於", min_value=0.0, value=float(user_config["max_pe"]), step=1.0)
     max_pb = st.number_input("股價淨值比 (P/B) 低於", min_value=0.0, value=float(user_config["max_pb"]), step=0.1)
 
-# ── 戰術濾網與多選框雙向綁定 (支援 0 秒即時過濾) ──
 st.sidebar.subheader("🔍 指標過濾器 (即時生效)")
 
 if "ms_target_signals" not in st.session_state:
@@ -1958,10 +1185,7 @@ if scan_btn:
                     df_t = df_t.dropna(subset=['Close'])
                     if len(df_t) > 40:
                         successful_tickers.add(t)
-                        try:
-                            avg_vol = float(df_t.groupby(df_t.index.date)['Volume'].sum().mean())
-                        except Exception:
-                            avg_vol = 0.0
+                        avg_vol = calc_robust_avg_vol(df_t)
 
                         df_proc = resample_to_tv_4h(df_t, t) if selected_tf == "4h" else df_t.copy()
                         res_tech = scan_signals(df_proc, recent_k=recent_k, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob, include_chan_bs=include_chan_bs)
@@ -1997,10 +1221,8 @@ if scan_btn:
                             "TV圖表": get_tv_link(t),
                             "SMC 結構": smc_str,
                             "最新收盤價": f"{res_tech['最新收盤價']:.2f} ({res_tech['漲跌幅']:+.2f}%)",
-                            "當前成交量": format_vol(cur_vol),
-                            "日均交易量": format_vol(avg_vol),
-                            "Raw_Cur_Vol": cur_vol,
-                            "Raw_Avg_Vol": avg_vol,
+                            "當前成交量": cur_vol,
+                            "日均交易量": avg_vol,
                             "All_Signals": res_tech["觸發指標通知"],
                             "最近支撐區": res_tech["最近支撐區"],
                             "最近壓力區": res_tech["最近壓力區"],
@@ -2174,7 +1396,6 @@ if "scan_cache" in st.session_state:
                 filtered_rows.append(row_copy)
         elif len(target_signals) > 0:
             sigs = r["All_Signals"].split(" ｜ ")
-            # 僅保留使用者在左側多選框中有勾選的訊號，讓表格更乾淨精簡！
             matched_sigs = [s for s in sigs if any(target in s for target in target_signals)]
             if matched_sigs:
                 row_copy["觸發指標通知"] = " ｜ ".join(matched_sigs)
@@ -2188,11 +1409,11 @@ if "scan_cache" in st.session_state:
     elif filtered_rows:
         df_report = pd.DataFrame(filtered_rows)
 
-        # 嚴格按照成交量由大到小排序 (收藏置頂可由左側勾選控制)
-        vol_col_key = "Raw_Avg_Vol" if vol_sort_by.startswith("日均") else "Raw_Cur_Vol"
+        # 嚴格按照真實數值成交量由大到小排序
+        vol_col_key = "日均交易量" if vol_sort_by.startswith("日均") else "當前成交量"
         df_report = df_report.sort_values(by=['Priority', vol_col_key], ascending=[False, False]).reset_index(drop=True)
 
-        # 精簡版核心欄位 (只保留最關鍵實戰資訊，版面清爽不擁擠)
+        # 精簡版重點欄位
         cols_to_show = ["標的代號", "TV圖表", "SMC 結構", "最新收盤價", "當前成交量", "日均交易量"]
         if use_fund:
             cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
@@ -2207,8 +1428,8 @@ if "scan_cache" in st.session_state:
                 "標的代號": st.column_config.TextColumn("標的代號", width="small"),
                 "SMC 結構": st.column_config.TextColumn("SMC 結構", width="small"),
                 "最新收盤價": st.column_config.TextColumn("最新收盤價 (漲跌)", width="medium"),
-                "當前成交量": st.column_config.TextColumn("當前成交量", width="small"),
-                "日均交易量": st.column_config.TextColumn("日均交易量", width="small"),
+                "當前成交量": st.column_config.NumberColumn("當前成交量", format="compact", width="small"),
+                "日均交易量": st.column_config.NumberColumn("日均交易量", format="compact", width="small"),
                 "觸發指標通知": st.column_config.TextColumn("觸發指標通知 (近 N 根 K 棒)", width="large"),
             },
             use_container_width=True,
@@ -2216,10 +1437,14 @@ if "scan_cache" in st.session_state:
             height=600
         )
 
-        # 選配折疊面板：想要偷看各股「最近支撐/壓力框價位」時點開即可，完全不佔主表空間
         with st.expander("📦 點此展開：各標的「最近 OB / 共振 / 中樞支撐與壓力區間」潛伏表"):
             cols_zone = ["標的代號", "TV圖表", "最新收盤價", "SMC 結構", "最近支撐區", "最近壓力區"]
-            st.dataframe(df_report[cols_zone], column_config={"TV圖表": st.column_config.LinkColumn("TV看圖", display_text="🔗 開圖", width="small")}, use_container_width=True, hide_index=True)
+            st.dataframe(
+                df_report[cols_zone],
+                column_config={"TV圖表": st.column_config.LinkColumn("TV看圖", display_text="🔗 開圖", width="small")},
+                use_container_width=True,
+                hide_index=True
+            )
     else:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
