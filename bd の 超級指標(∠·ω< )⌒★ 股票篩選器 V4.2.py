@@ -19,65 +19,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
-<style>
-    /* 頂部 24 態大盤風向標卡片美化 */
-    .baro-card {
-        background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96));
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 12px;
-        padding: 14px 15px;
-        margin-bottom: 10px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-        color: #e0e3eb;
-    }
-    .baro-bull { border-left: 5px solid #00e676; }
-    .baro-bear { border-left: 5px solid #ff5252; }
-    .baro-warn { border-left: 5px solid #ffca28; }
-    .baro-title {
-        font-size: 1.08rem;
-        font-weight: 800;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 6px;
-    }
-    .baro-price {
-        font-size: 0.92rem;
-        font-family: monospace;
-        color: #00e5ff;
-    }
-    .baro-badge {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 0.80rem;
-        font-weight: 700;
-        margin-bottom: 6px;
-    }
-    .badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }
-    .badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }
-    .badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }
-    .baro-advice {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 6px;
-    }
-    .baro-sub {
-        font-size: 0.75rem;
-        color: #9ba2b0;
-        line-height: 1.48;
-    }
-    .metric-pill {
-        background: rgba(255,255,255,0.07);
-        padding: 1px 6px;
-        border-radius: 4px;
-        font-family: monospace;
-        color: #ffd600;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    "<style>"
+    ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 15px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
+    ".baro-bull { border-left: 5px solid #00e676; }"
+    ".baro-bear { border-left: 5px solid #ff5252; }"
+    ".baro-warn { border-left: 5px solid #ffca28; }"
+    ".baro-title { font-size: 1.08rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
+    ".baro-price { font-size: 0.92rem; font-family: monospace; color: #00e5ff; }"
+    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.80rem; font-weight: 700; margin-bottom: 6px; }"
+    ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
+    ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
+    ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
+    ".baro-advice { font-size: 0.85rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }"
+    ".baro-sub { font-size: 0.75rem; color: #9ba2b0; line-height: 1.48; }"
+    ".metric-pill { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; }"
+    "</style>",
+    unsafe_allow_html=True
+)
 
 st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 量化雷達終端 V7.1")
 st.caption("100% 鏡像同步 TradingView V3.8 指標：搭載 **24 態纏論×SMC 大盤風向標 (含近14K動能修正 & 近2K準備抄底警報)** × **OB 共振重疊** × **纏論中樞延伸/共振確認** × **自動風控 (SL/TP)**")
@@ -1311,7 +1270,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False, incl
         in_zone = " (⚡進入框內!)" if (rz['bot'] <= last_close <= rz['top']) else f" ({nearest_res_dist:+.2f}%)"
         nearest_res_str = f"{rz['type_name']} [{rz['bot']:.2f}~{rz['top']:.2f}]{in_zone}"
 
-    # ── 12. 額外提取「最近 2 根 K 棒 (bar_i >= n - 2)」剛觸發的即時訊號，供風向標「準備抄底/逃頂」使用 ──
+    # ── 12. 提取「最近 2 根 K 棒 (bar_i >= n - 2)」剛觸發的即時訊號，供風向標「準備抄底/逃頂」使用 ──
     k2_events = [ev['sig_str'] for ev in all_valid_events if ev['bar_i'] >= n - 2]
     k2_events = list(dict.fromkeys(k2_events))
 
