@@ -13,10 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 warnings.filterwarnings("ignore")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁基本設定與自訂 CSS 美化
+# 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.7",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.0",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,27 +24,39 @@ st.set_page_config(
 
 st.markdown(
     "<style>"
-    ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 14px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
+    /* 全域字體與間距微調 */
+    ".block-container { padding-top: 1.5rem; padding-bottom: 2rem; }"
+    /* 大盤與總經玻璃擬態卡片 */
+    ".baro-card { background: linear-gradient(145deg, rgba(26,30,41,0.95), rgba(16,19,26,0.98)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 14px; margin-bottom: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.35); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease; min-height: 215px; display: flex; flex-direction: column; justify-content: space-between; }"
+    ".baro-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.55); border-color: rgba(255,255,255,0.18); }"
+    ".macro-card-sm { min-height: 118px !important; }"
     ".baro-bull { border-left: 5px solid #00e676; }"
     ".baro-bear { border-left: 5px solid #ff5252; }"
     ".baro-warn { border-left: 5px solid #ffca28; }"
-    ".baro-title { font-size: 1.00rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }"
-    ".baro-price { font-size: 0.90rem; font-family: monospace; color: #00e5ff; }"
-    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; margin-bottom: 6px; }"
-    ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
-    ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
-    ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
-    ".baro-advice { font-size: 0.84rem; font-weight: 700; color: #ffffff; margin-bottom: 5px; }"
-    ".baro-sub { font-size: 0.74rem; color: #9ba2b0; line-height: 1.45; }"
-    ".metric-pill { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; }"
-    ".strategy-box { background: linear-gradient(135deg, rgba(20,26,40,0.98), rgba(30,38,56,0.98)); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 6px 22px rgba(0,0,0,0.4); }"
-    ".news-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 9px 12px; margin-bottom: 7px; }"
+    ".baro-title { font-size: 1.00rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
+    ".baro-price { font-size: 0.90rem; font-family: 'JetBrains Mono', monospace; color: #00e5ff; font-weight: 700; }"
+    ".tv-mini-btn { font-size: 0.72rem; background: rgba(0,229,255,0.12); color: #00e5ff !important; padding: 2px 6px; border-radius: 4px; text-decoration: none !important; border: 1px solid rgba(0,229,255,0.3); margin-left: 6px; }"
+    ".tv-mini-btn:hover { background: rgba(0,229,255,0.28); }"
+    ".baro-badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 0.76rem; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.3px; }"
+    ".badge-bull { background: rgba(0, 230, 118, 0.16); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
+    ".badge-bear { background: rgba(255, 82, 82, 0.16); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
+    ".badge-warn { background: rgba(255, 202, 40, 0.16); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
+    ".baro-advice { font-size: 0.84rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }"
+    ".baro-sub { font-size: 0.74rem; color: #a3aab8; line-height: 1.52; }"
+    ".metric-pill { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; font-weight: 600; }"
+    /* 頂部戰術決策中心與能量條 */
+    ".strategy-box { background: linear-gradient(135deg, rgba(19,24,36,0.98), rgba(28,36,52,0.98)); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }"
+    ".gauge-wrap { width: 100%; height: 10px; background: rgba(255,82,82,0.35); border-radius: 99px; overflow: hidden; margin: 10px 0 6px 0; display: flex; border: 1px solid rgba(255,255,255,0.12); }"
+    ".gauge-bull { height: 100%; background: linear-gradient(90deg, #00c853, #00e676); transition: width 0.4s ease; }"
+    ".news-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; transition: background 0.15s ease; }"
+    ".news-card:hover { background: rgba(255,255,255,0.06); }"
+    ".kpi-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; padding: 10px 14px; text-align: center; margin-bottom: 10px; }"
     "</style>",
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.7")
-st.caption("全自動 8 大總經指標版：**即時抓取 CPI / PPI / 核心PCE / 非農就業(NFP) / 初領失業金 / 零售銷售 / 殖利率 / 財經新聞摘要 × 大盤24態戰術指揮**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.0")
+st.caption("機構級玻璃擬態戰情版：**8大FRED總經自動判讀 × 新聞AI摘要 × 修正版大盤24態風向標 × 全共振嚴格回踩確認 & 0秒即時過濾**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義 (已移除 CHOCH / BOS / 纏論123買賣點)
@@ -1023,7 +1035,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
 # 🌐 全自動 8 大官方總經指標 (FRED) + 新聞智慧摘要 + 5大盤 24 態 + 綜合戰術引擎
 # ════════════════════════════════════════════════════════════════════════════
 def translate_and_summarize_news(title):
-    """根據中英文新聞標題自動萃取主題 (含 CPI/PPI/非農/初領失業金/零售/Fed) 並生成中文摘要"""
     t_low = title.lower()
     topics = []
     if any(w in t_low for w in ["cpi", "consumer price", "inflation", "物價", "通膨"]):
@@ -1099,16 +1110,16 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
     bear_score = 0.0
     key_drivers = []
 
-    # ── 1. 多執行緒並行抓取聯準會 FRED 9 大核心經濟數據 Series ──
+    # ── 1. 多執行緒並行抓取聯準會 FRED 10 大核心經濟數據 Series ──
     fred_ids = [
         "CPIAUCSL",  # 1. CPI 消費者物價指數
-        "CPILFESL",  # 2. 核心 CPI (不含食品與能源)
-        "PPIACO",    # 3. PPI 生產者物價指數 (全部商品)
-        "PCEPILFE",  # 4. 核心 PCE 物價指數 (Fed最重視)
-        "PAYEMS",    # 5. 非農就業總人數 (計算單月新增非農 NFP)
+        "CPILFESL",  # 2. 核心 CPI
+        "PPIACO",    # 3. PPI 生產者物價指數
+        "PCEPILFE",  # 4. 核心 PCE 物價指數
+        "PAYEMS",    # 5. 非農就業總人數
         "UNRATE",    # 6. 失業率
-        "ICSA",      # 7. 當週初領失業金人數 (高頻每週公布)
-        "RSAFS",     # 8. 零售銷售額 (觀察消費動能)
+        "ICSA",      # 7. 當週初領失業金人數
+        "RSAFS",     # 8. 零售銷售額
         "T10Y2Y",    # 9. 10Y-2Y 美債殖利率利差
         "DFF"        # 10. 聯邦基金有效利率
     ]
@@ -1130,7 +1141,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         for sid, df_res in ex.map(fetch_one_fred, fred_ids):
             fred_dict[sid] = df_res
 
-    # (1) 美國 CPI 與核心 CPI (CPIAUCSL / CPILFESL)
+    # (1) 美國 CPI 與核心 CPI
     df_cpi = fred_dict.get("CPIAUCSL", pd.DataFrame())
     df_core = fred_dict.get("CPILFESL", pd.DataFrame())
     if len(df_cpi) >= 14:
@@ -1159,14 +1170,14 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bias, cls = "🟡 通膨黏著 (高檔震盪)", "warn"
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "CPI",
             "title": f"🇺🇸 美國 CPI 通膨 ({cpi_date})",
             "main": f"{yoy_now:.1f}%",
             "sub": f"前值 {yoy_prev:.1f}% ({diff_yoy:+.1f}%) ｜ 月增 {mom_now:+.1f}%{core_str}",
             "badge": bias, "cls": cls
         })
 
-    # (2) 美國 PPI 生產者物價指數 (PPIACO - 上游通膨領先指標)
+    # (2) 美國 PPI 生產者物價指數
     df_ppi = fred_dict.get("PPIACO", pd.DataFrame())
     if len(df_ppi) >= 14:
         ppi_yoy = (df_ppi['VAL'].iloc[-1] / df_ppi['VAL'].iloc[-13] - 1.0) * 100.0
@@ -1187,18 +1198,18 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bias, cls = "🟡 生產端物價溫和", "warn"
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "PPI",
             "title": f"🏭 美國 PPI 物價 ({ppi_date})",
             "main": f"{ppi_yoy:.1f}%",
             "sub": f"前值 {ppi_prev:.1f}% ({diff_ppi:+.1f}%) ｜ 月增 {ppi_mom:+.1f}%",
             "badge": bias, "cls": cls
         })
 
-    # (3) 美國非農就業報告：單月新增非農人數 (PAYEMS) + 失業率 (UNRATE)
+    # (3) 美國非農就業報告 (NFP + 失業率)
     df_nfp = fred_dict.get("PAYEMS", pd.DataFrame())
     df_un = fred_dict.get("UNRATE", pd.DataFrame())
     if len(df_nfp) >= 3 and len(df_un) >= 3:
-        nfp_add = float(df_nfp['VAL'].iloc[-1] - df_nfp['VAL'].iloc[-2])  # 單位：千人 (K)
+        nfp_add = float(df_nfp['VAL'].iloc[-1] - df_nfp['VAL'].iloc[-2])
         nfp_prev = float(df_nfp['VAL'].iloc[-2] - df_nfp['VAL'].iloc[-3])
         un_now = float(df_un['VAL'].iloc[-1])
         un_prev = float(df_un['VAL'].iloc[-2])
@@ -1217,17 +1228,17 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bull_score += 1.5
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "NFP",
             "title": f"👷 非農就業 NFP ({nfp_date})",
             "main": f"{nfp_add:+.0f}K",
             "sub": f"前值 {nfp_prev:+.0f}K ｜ 失業率 {un_now:.1f}% (前值 {un_prev:.1f}%)",
             "badge": bias, "cls": cls
         })
 
-    # (4) 當週初領失業金人數 (ICSA - 每週更新的高頻指標)
+    # (4) 當週初領失業金人數 (ICSA)
     df_icsa = fred_dict.get("ICSA", pd.DataFrame())
     if len(df_icsa) >= 3:
-        ic_now = float(df_icsa['VAL'].iloc[-1]) / 1000.0  # 轉為 K
+        ic_now = float(df_icsa['VAL'].iloc[-1]) / 1000.0
         ic_prev = float(df_icsa['VAL'].iloc[-2]) / 1000.0
         raw_dt = str(df_icsa['DATE'].iloc[-1])
         diff_ic = ic_now - ic_prev
@@ -1242,14 +1253,14 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bias, cls = "🟡 初領失業金符合預期", "warn"
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "ICSA",
             "title": f"🧾 初領失業金 ({raw_dt[5:]})",
             "main": f"{ic_now:.0f}K",
             "sub": f"前週 {ic_prev:.0f}K ({diff_ic:+.0f}K) ｜ 每週高頻就業指標",
             "badge": bias, "cls": cls
         })
 
-    # (5) 核心 PCE 物價指數 (PCEPILFE - 聯準會最青睞通膨指標)
+    # (5) 核心 PCE 物價指數
     df_pce = fred_dict.get("PCEPILFE", pd.DataFrame())
     if len(df_pce) >= 14:
         pce_yoy = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-13] - 1.0) * 100.0
@@ -1269,14 +1280,14 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bias, cls = "🟡 核心PCE持平", "warn"
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "PCE",
             "title": f"🎯 核心 PCE 年增 ({pce_date})",
             "main": f"{pce_yoy:.2f}%",
             "sub": f"前值 {pce_prev:.2f}% ({diff_pce:+.2f}%) ｜ 月增 {pce_mom:+.2f}%",
             "badge": bias, "cls": cls
         })
 
-    # (6) 美國零售銷售月增率 (RSAFS - 觀察內需消費力道)
+    # (6) 美國零售銷售月增率
     df_ret = fred_dict.get("RSAFS", pd.DataFrame())
     if len(df_ret) >= 14:
         ret_mom = (df_ret['VAL'].iloc[-1] / df_ret['VAL'].iloc[-2] - 1.0) * 100.0
@@ -1294,14 +1305,14 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bias, cls = "🟡 消費力道溫和", "warn"
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "RETAIL",
             "title": f"🛒 美國零售銷售 ({ret_date})",
             "main": f"{ret_mom:+.2f}%",
             "sub": f"年增率 {ret_yoy:+.1f}% ｜ 美國 GDP 70% 消費引擎指標",
             "badge": bias, "cls": cls
         })
 
-    # (7) 10Y-2Y 美債殖利率利差 (T10Y2Y)
+    # (7) 10Y-2Y 美債殖利率利差
     df_sp = fred_dict.get("T10Y2Y", pd.DataFrame())
     if len(df_sp) >= 5:
         sp_now = float(df_sp['VAL'].iloc[-1])
@@ -1318,7 +1329,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             bull_score += 0.5
 
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "SPREAD",
             "title": f"🏦 10Y-2Y 美債利差 ({raw_dt[5:]})",
             "main": f"{sp_now:+.2f}%",
             "sub": f"一週前 {sp_prev:+.2f}% ｜ 景氣循環與銀行利差指標",
@@ -1332,14 +1343,13 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         dff_prev = float(df_dff['VAL'].iloc[-10]) if len(df_dff) >= 10 else float(df_dff['VAL'].iloc[0])
         raw_dt = str(df_dff['DATE'].iloc[-1])
         macro_cards.append({
-            "sort_dt": raw_dt,
+            "sort_dt": raw_dt, "key_id": "FED",
             "title": f"🏛️ Fed 基準利率 ({raw_dt[5:]})",
             "main": f"{dff_now:.2f}%",
             "sub": f"前期 {dff_prev:.2f}% ｜ 聯邦基金有效利率 (EFFR)",
             "badge": "🟡 緊盯 FOMC 利率決議動向", "cls": "warn"
         })
 
-    # 依照數據最新日期排序（越近期更新的排越前面）
     macro_cards.sort(key=lambda x: x["sort_dt"], reverse=True)
 
     # ── 2. 抓取跨市場即時資金指標 (VIX, 10Y美債, 美元指數, 原油, 黃金) ──
@@ -1511,7 +1521,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
     except Exception:
         pass
 
-    # ── 5. 計算大盤技術結構得分，並與宏觀經濟交叉生成「終極戰術指令」 ──
+    # ── 5. 嚴格計算大盤技術結構得分 (修正紅CHOCH+一買誤判問題)，並與宏觀經濟交叉生成戰術指令 ──
     tech_bull_cnt, tech_bear_cnt = 0, 0
     k2_dip_indices, k2_top_indices = [], []
     bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認"]
@@ -1523,7 +1533,10 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             smc_id = res["SMC_State_ID"]
             chan_long = res["Chan_Is_Long"]
             chan_cls = res["Chan_Cls"]
-            is_bull = (smc_id in [1, 2] and (chan_long or chan_cls == 0)) or (smc_id in [3, 4] and chan_long and chan_cls in [1, 2])
+            wt_now = res["WT快線"]
+            rsi_now = res["平均RSI"]
+            # 只有 SMC 為綠BOS/綠CHOCH 且纏論非賣點、動能未轉弱才算真多頭結構
+            is_bull = (smc_id in [1, 2]) and (chan_long or chan_cls == 0) and (rsi_now >= 45.0 or wt_now >= -10.0)
             if is_bull:
                 tech_bull_cnt += 1
             else:
@@ -1537,28 +1550,27 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
 
     macro_net = bull_score - bear_score
 
-    # 6 大綜合戰術場景判讀 (對沖 / 做空 / 抄底 / 順勢做多 / 右側回踩 / 區間)
     if macro_net <= -1.5 and tech_bull_cnt >= 2:
         tactical_mode = "🛡️ 【買入對沖 (Hedge) ／ 逢高減碼防守】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**宏觀經濟與資金面偏空**（如 CPI/PPI 通膨反彈、美債殖利率與美元走高壓抑估值），但**大盤指數仍處於多頭結構或高檔震盪**。"
+            "目前**宏觀經濟與資金面偏空**（如 CPI/PPI 通膨反彈、美債殖利率與美元走高壓抑估值），但**部分大盤指數仍處於多頭結構或高檔震盪**。"
             "這種「基本面逆風 vs 技術面高檔」最容易引發突發性補跌或誘多殺盤！\n"
             "👉 **實戰建議**：切勿在突破時追高！現有多單建議逢反彈至壓力區減碼，或配置 **SQQQ / SPXS / 台指空單 / VIX 避險部位進行對沖 (Hedge)**；若要做多僅能等待回踩「🌟中樞共振 / 🟪OB共振支撐」收腳確認。"
         )
     elif macro_net <= -1.5 and tech_bear_cnt >= 3 and len(k2_dip_indices) == 0:
-        tactical_mode = "📉 【順勢做空 (Short) ／ 反彈測試壓力做空】"
+        tactical_mode = "📉 【順勢做空 (Short) ／ 反彈測試壓力做空 & 買入對沖】"
         tactical_cls = "bear"
         tactical_detail = (
             "目前**宏觀數據偏空（通膨/利率逆風）且四大指數多數已跌破 SMC/纏論結構轉空**，形成「總經 ＋ 技術雙重空頭共振」。\n"
-            "👉 **實戰建議**：保留高現金水位，操作以 **順勢做空、反彈遇『🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警』放空或買入反向 ETF** 為主，未出現極度超賣訊號前切勿盲目摸底。"
+            "👉 **實戰建議**：保留高現金水位，現貨部位務必配置 **反向 ETF (如 SQQQ / 00632R) 或期貨空單對沖**；積極操作者可於反彈遇 **『🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警』順勢做空**，未出現極度超賣訊號與收腳確認前切勿盲目接刀。"
         )
     elif len(k2_dip_indices) > 0 and (tech_bear_cnt >= 2 or macro_net < 0):
         tactical_mode = f"⚡ 【左側分批抄底 (Buy the Dip) ／ 搶反彈快進快出】({', '.join(k2_dip_indices)} 觸發支撐/抄底)"
         tactical_cls = "bull"
         tactical_detail = (
             f"雖然宏觀或趨勢仍有壓力，但大盤核心指數（**{', '.join(k2_dip_indices)}**）近 2 根 K 棒已觸發 **抄底或關鍵 OB/中樞支撐守穩訊號**，短線急跌宣洩後具備強勁技術面反抽動能。\n"
-            "👉 **實戰建議**：可針對左側篩選出「🟢恐慌抄底 / 🟣極度超賣 / 🌟中樞共振Buy」的強勢權值股或槓桿 ETF (如 00631L / QLD / SOXL) **分批試單抄底**，並嚴格以該支撐下緣作為停損防守點。"
+            "👉 **實戰建議**：可針對下方篩選出「🟢恐慌抄底 / 🟣極度超賣 / 🌟中樞共振Buy」的強勢權值股或槓桿 ETF (如 00631L / QLD / SOXL) **分批試單抄底**，並嚴格以該支撐下緣作為停損防守點。"
         )
     elif macro_net >= 1.5 and tech_bull_cnt >= 3:
         tactical_mode = "🚀 【順勢積極做多 (Trend Long) ／ 抱牢主升段】"
@@ -1612,7 +1624,7 @@ st.sidebar.subheader("📌 收藏標的清單")
 fav_input = st.sidebar.text_area(
     "請輸入股票代號 (用半形逗號分隔)：",
     value=user_config["favorites"],
-    height=115,
+    height=110,
     help="台股請加 .TW (如 2330.TW)。大盤 ^TWII，美股期貨 NQ=F，加密貨幣 BTC-USD。"
 )
 
@@ -1718,14 +1730,14 @@ with col_b2:
     scan_btn = st.button("🚀 掃描個股清單", type="primary", use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 第一部分：免按鈕自動執行！打開網頁直接呈現「8大總經指標 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
+# 第一部分：免按鈕自動執行！「8大總經指標 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
 # ════════════════════════════════════════════════════════════════════════════
 with st.spinner("🌐 正在自動同步 FRED 8大總經指標 (CPI/PPI/非農/初領失業金/PCE/零售)、即時新聞摘要與 5 大盤結構..."):
     auto_intel = fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob)
 
 if auto_intel:
-    # ── 頂部核心：宏觀經濟 × 大盤結構 綜合戰術指揮中心 ──
-    st.subheader("🧭 宏觀經濟 × 大盤結構：全局戰術決策中心 (免掃描自動更新)")
+    # ── 頂部核心：宏觀經濟 × 大盤結構 綜合戰術指揮中心 (含動態多空能量條) ──
+    st.subheader("🧭 宏觀經濟 × 大盤結構：全局戰術決策中心")
 
     t_cls = auto_intel["tactical_cls"]
     b_sc = auto_intel["bull_score"]
@@ -1733,66 +1745,95 @@ if auto_intel:
     tb_cnt = auto_intel["tech_bull_cnt"]
     ts_cnt = auto_intel["tech_bear_cnt"]
 
+    total_macro = max(0.1, b_sc + s_sc)
+    bull_pct = int(round((b_sc / total_macro) * 100))
+    bear_pct = 100 - bull_pct
+
     drivers_html = ""
     if auto_intel["key_drivers"]:
         drivers_list = "".join([f"<li style='margin-bottom:3px;'>{d}</li>" for d in auto_intel["key_drivers"]])
-        drivers_html = f"<div style='margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:0.83rem;color:#ffd600;'><b>📌 當前核心總經與市場驅動因子：</b><ul style='margin:4px 0 0 18px;padding:0;color:#e0e3eb;'>{drivers_list}</ul></div>"
+        drivers_html = f"<div style='margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:0.82rem;color:#ffd600;'><b>📌 當前核心總經與市場驅動因子：</b><ul style='margin:4px 0 0 18px;padding:0;color:#e0e3eb;'>{drivers_list}</ul></div>"
 
     strat_html = (
         f'<div class="strategy-box baro-{t_cls}">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
-        f'<span style="font-size:1.22rem;font-weight:900;color:#ffffff;">🎯 綜合戰術指令：{auto_intel["tactical_mode"]}</span>'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        f'<span style="font-size:1.20rem;font-weight:900;color:#ffffff;">🎯 綜合戰術指令：{auto_intel["tactical_mode"]}</span>'
         f'<div>'
         f'<span class="baro-badge badge-{t_cls}" style="margin-right:6px;">宏觀資金評分：多 {b_sc:.1f} vs 空 {s_sc:.1f}</span>'
-        f'<span class="baro-badge badge-{"bull" if tb_cnt >= ts_cnt else "bear"}">大盤結構 ({selected_tf_label})：{tb_cnt} 多 vs {ts_cnt} 空</span>'
+        f'<span class="baro-badge badge-{"bull" if tb_cnt > ts_cnt else ("bear" if ts_cnt > tb_cnt else "warn")}">大盤真多頭結構 ({selected_tf_label})：{tb_cnt} 多 vs {ts_cnt} 空</span>'
         f'</div></div>'
-        f'<div style="font-size:0.90rem;color:#ffffff;line-height:1.6;">{auto_intel["tactical_detail"].replace(chr(10), "<br>")}</div>'
+        f'<div class="gauge-wrap"><div class="gauge-bull" style="width:{bull_pct}%;"></div></div>'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.74rem;color:#9ba2b0;margin-bottom:8px;">'
+        f'<span style="color:#00e676;font-weight:700;">🟢 多方順風能量 {bull_pct}%</span>'
+        f'<span style="color:#ff5252;font-weight:700;">🔴 空方逆風壓力 {bear_pct}%</span>'
+        f'</div>'
+        f'<div style="font-size:0.89rem;color:#ffffff;line-height:1.58;">{auto_intel["tactical_detail"].replace(chr(10), "<br>")}</div>'
         f'{drivers_html}'
         f'</div>'
     )
     st.markdown(strat_html, unsafe_allow_html=True)
 
-    # ── 8 大 FRED 總經數據卡片 (依最新更新日期排序，分 2 排 4 欄呈現) ──
-    if auto_intel["macro_cards"]:
-        st.caption("📊 **美國聯準會 FRED 官方總經數據自動判讀 (依最新數據期別排序：涵蓋 CPI / PPI / 非農 NFP / 初領失業金 / 核心 PCE / 零售銷售 / 殖利率差)**")
-        cards = auto_intel["macro_cards"]
-        for row_start in range(0, len(cards), 4):
-            row_items = cards[row_start : row_start + 4]
-            m_cols = st.columns(4)
-            for idx, mc in enumerate(row_items):
-                with m_cols[idx]:
+    # ── 分頁收納設計：讓版面清爽不冗長 ──
+    tab_quick, tab_fred, tab_news = st.tabs([
+        "💹 跨市場即時資金 & 核心總經速覽",
+        f"🏛️ 聯準會 FRED 完整 8 大總經數據庫 ({len(auto_intel['macro_cards'])}項)",
+        f"📰 最新重大財經新聞 & AI 智慧中文摘要 ({len(auto_intel['news_items'])}則)"
+    ])
+
+    with tab_quick:
+        if auto_intel["market_cards"]:
+            mk_cols = st.columns(len(auto_intel["market_cards"]))
+            for idx, mk in enumerate(auto_intel["market_cards"]):
+                with mk_cols[idx]:
+                    chg_col = "#00e676" if mk["chg"] >= 0 else "#ff5252"
+                    mk_html = (
+                        f'<div class="baro-card macro-card-sm baro-{mk["cls"]}">'
+                        f'<div><div class="baro-title"><span>{mk["title"]}</span>'
+                        f'<span class="baro-price">{mk["price"]} <span style="color:{chg_col};font-size:0.78rem;">({mk["chg"]:+.2f}%)</span></span></div>'
+                        f'<span class="baro-badge badge-{mk["cls"]}">{mk["badge"]}</span></div>'
+                        f'<div class="baro-sub">{mk["sub"]}</div>'
+                        f'</div>'
+                    )
+                    st.markdown(mk_html, unsafe_allow_html=True)
+
+        # 同頁精選最近期前 4 張核心 FRED 數據卡片 (如 CPI / PPI / 非農 / 初領失業金)
+        if auto_intel["macro_cards"]:
+            top4_macro = auto_intel["macro_cards"][:4]
+            m4_cols = st.columns(len(top4_macro))
+            for idx, mc in enumerate(top4_macro):
+                with m4_cols[idx]:
                     c_html = (
-                        f'<div class="baro-card baro-{mc["cls"]}">'
-                        f'<div class="baro-title"><span>{mc["title"]}</span>'
+                        f'<div class="baro-card macro-card-sm baro-{mc["cls"]}">'
+                        f'<div><div class="baro-title"><span>{mc["title"]}</span>'
                         f'<span class="baro-price">{mc["main"]}</span></div>'
-                        f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span>'
+                        f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span></div>'
                         f'<div class="baro-sub">{mc["sub"]}</div>'
                         f'</div>'
                     )
                     st.markdown(c_html, unsafe_allow_html=True)
 
-    # ── 跨市場即時資金風向標 (VIX / 10Y美債 / 美元 / 原油 / 黃金) ──
-    if auto_intel["market_cards"]:
-        st.caption("💹 **跨市場即時資金風向標 (VIX 恐慌 / 10Y 美債殖利率 / DXY 美元指數 / WTI 原油 / 黃金)**")
-        mk_cols = st.columns(len(auto_intel["market_cards"]))
-        for idx, mk in enumerate(auto_intel["market_cards"]):
-            with mk_cols[idx]:
-                chg_col = "#00e676" if mk["chg"] >= 0 else "#ff5252"
-                mk_html = (
-                    f'<div class="baro-card baro-{mk["cls"]}">'
-                    f'<div class="baro-title"><span>{mk["title"]}</span>'
-                    f'<span class="baro-price">{mk["price"]} <span style="color:{chg_col};font-size:0.80rem;">({mk["chg"]:+.2f}%)</span></span></div>'
-                    f'<span class="baro-badge badge-{mk["cls"]}">{mk["badge"]}</span>'
-                    f'<div class="baro-sub">{mk["sub"]}</div>'
-                    f'</div>'
-                )
-                st.markdown(mk_html, unsafe_allow_html=True)
+    with tab_fred:
+        if auto_intel["macro_cards"]:
+            cards = auto_intel["macro_cards"]
+            for row_start in range(0, len(cards), 4):
+                row_items = cards[row_start : row_start + 4]
+                m_cols = st.columns(4)
+                for idx, mc in enumerate(row_items):
+                    with m_cols[idx]:
+                        c_html = (
+                            f'<div class="baro-card macro-card-sm baro-{mc["cls"]}">'
+                            f'<div><div class="baro-title"><span>{mc["title"]}</span>'
+                            f'<span class="baro-price">{mc["main"]}</span></div>'
+                            f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span></div>'
+                            f'<div class="baro-sub">{mc["sub"]}</div>'
+                            f'</div>'
+                        )
+                        st.markdown(c_html, unsafe_allow_html=True)
 
-    # ── 近期重大財經新聞與 AI 智慧中文摘要 (預設直接展開顯示) ──
-    if auto_intel["news_items"]:
-        with st.expander("📰 近期重大財經新聞 ＆ 智慧摘要分析 (自動抓取 CPI / PPI / 非農 / 聯準會 / 台美股動態)", expanded=True):
+    with tab_news:
+        if auto_intel["news_items"]:
             n_cols = st.columns(2)
-            for idx, n_item in enumerate(auto_intel["news_items"][:6]):
+            for idx, n_item in enumerate(auto_intel["news_items"]):
                 with n_cols[idx % 2]:
                     s_color = "#ff5252" if "利空" in n_item["sentiment"] else ("#00e676" if "利多" in n_item["sentiment"] else "#ffca28")
                     link_html = f'<a href="{n_item["link"]}" target="_blank" style="color:#e0e3eb;text-decoration:none;font-weight:700;">{n_item["title"]} 🔗</a>' if n_item["link"] else f'<b>{n_item["title"]}</b>'
@@ -1808,10 +1849,10 @@ if auto_intel:
                         f'</div>'
                     )
                     st.markdown(n_html, unsafe_allow_html=True)
+        else:
+            st.info("暫無即時新聞資料。")
 
-    st.markdown("---")
-
-    # ── 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 (免按掃描直接顯示) ──
+    # ── 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 (已修正紅CHOCH+一買判定邏輯) ──
     st.subheader(f"🚥 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ({selected_tf_label})")
 
     baro_results = auto_intel["baro_results"]
@@ -1859,22 +1900,35 @@ if auto_intel:
                 base_advice = b_res["Chan_Action_Base"]
                 chan_long = b_res["Chan_Is_Long"]
                 chan_cls = b_res["Chan_Cls"]
+                wt_now = b_res["WT快線"]
+                rsi_now = b_res["平均RSI"]
 
-                struct_is_bull = (smc_id in [1, 2] and (chan_long or chan_cls == 0)) or (smc_id in [3, 4] and chan_long and chan_cls in [1, 2])
-                struct_is_bear = (smc_id in [3, 4] and (not chan_long)) or (smc_id in [1, 2] and (not chan_long and chan_cls != 0))
+                # ✅ 嚴格定義結構多空：SMC 紅CHOCH/紅BOS 絕不直接視為多頭綠燈！
+                struct_is_bull = (smc_id in [1, 2]) and (chan_long or chan_cls == 0)
+                struct_is_bear = (smc_id in [3, 4]) and ((not chan_long) or (rsi_now <= 42.0 and wt_now < 0))
 
                 if bear_count > bull_count:
                     mom_14k_str = f"近14K空偏多 (空{bear_count}>多{bull_count})"
-                    tactical_tag = "⚠️ 謹慎做多 (等回踩)" if struct_is_bull else "🔴 順勢做空 / 空單抱牢"
+                    tactical_tag = "⚠️ 多頭回檔 (等回踩)" if struct_is_bull else "🔴 順勢偏空 / 防守為主"
                     style_cls = "warn" if struct_is_bull else "bear"
                 elif bull_count > bear_count:
                     mom_14k_str = f"近14K多偏空 (多{bull_count}>空{bear_count})"
-                    tactical_tag = "🔥 積極做多 / 順勢抱牢" if struct_is_bull else "⚠️ 謹慎做空 (防反抽)"
+                    tactical_tag = "🔥 積極做多 / 順勢抱牢" if struct_is_bull else "⚠️ 跌深反抽 (搶短慎行)"
                     style_cls = "bull" if struct_is_bull else "warn"
                 else:
                     mom_14k_str = f"近14K多空均衡 ({bull_count}:{bear_count})"
-                    tactical_tag = "🟢 偏多震盪" if struct_is_bull else ("🔴 偏空震盪" if struct_is_bear else "⚪ 區間觀望")
-                    style_cls = "bull" if struct_is_bull else ("bear" if struct_is_bear else "warn")
+                    if struct_is_bull:
+                        if rsi_now >= 50 and wt_now >= -10:
+                            tactical_tag, style_cls = "🟢 偏多震盪", "bull"
+                        else:
+                            tactical_tag, style_cls = "⚠️ 多頭降溫 (留意回踩)", "warn"
+                    elif struct_is_bear:
+                        tactical_tag, style_cls = "🔴 偏空探底 (弱勢尋底)", "bear"
+                    else:
+                        if smc_id in [3, 4]:
+                            tactical_tag, style_cls = "⚠️ 破位初止跌 (搶短慎行)", "warn"
+                        else:
+                            tactical_tag, style_cls = "⚠️ 高位背離震盪 (減碼防守)", "warn"
 
                 k2_sigs = b_res.get("K2_Signals", [])
                 k2_bull_hits = [s.split("(")[0] for s in k2_sigs if any(k in s for k in bottom_dip_kws)]
@@ -1884,28 +1938,31 @@ if auto_intel:
                 if k2_bull_hits:
                     hit_names = " + ".join(k2_bull_hits[:2])
                     dip_word = "⚡ 準備抄底！" if (smc_id in [3, 4] or any("抄底" in x or "超賣" in x or "Bottom" in x or "陷阱" in x for x in k2_bull_hits)) else "⚡ 右側回踩買點！"
-                    k2_banner_html = f'<div style="background:rgba(0,230,118,0.22);border:1px solid #00e676;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#00e676;font-weight:700;">{dip_word} 近2K觸發：{hit_names}</div>'
+                    k2_banner_html = f'<div style="background:rgba(0,230,118,0.22);border:1px solid #00e676;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.78rem;color:#00e676;font-weight:700;">{dip_word} 近2K：{hit_names}</div>'
                     style_cls = "bull"
                 elif k2_bear_hits:
                     hit_names = " + ".join(k2_bear_hits[:2])
-                    k2_banner_html = f'<div style="background:rgba(255,82,82,0.22);border:1px solid #ff5252;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.80rem;color:#ff5252;font-weight:700;">🚨 準備逃頂/防守！ 近2K觸發：{hit_names}</div>'
+                    k2_banner_html = f'<div style="background:rgba(255,82,82,0.22);border:1px solid #ff5252;border-radius:6px;padding:5px 8px;margin-bottom:7px;font-size:0.78rem;color:#ff5252;font-weight:700;">🚨 準備逃頂/防守！ 近2K：{hit_names}</div>'
                     if style_cls == "bull":
                         style_cls = "warn"
 
                 px_val = b_res["最新收盤價"]
                 chg_val = b_res["漲跌幅"]
                 chg_col = "#00e676" if chg_val >= 0 else "#ff5252"
+                tv_url = get_tv_link(b_tick)
 
                 card_html = (
                     f'<div class="baro-card baro-{style_cls}">'
-                    f'<div class="baro-title"><span>{b_tick}</span>'
-                    f'<span class="baro-price">{px_val:.2f} <span style="color:{chg_col};font-size:0.82rem;">({chg_val:+.2f}%)</span></span></div>'
+                    f'<div>'
+                    f'<div class="baro-title"><span>{b_tick}<a href="{tv_url}" target="_blank" class="tv-mini-btn">🔗TV</a></span>'
+                    f'<span class="baro-price">{px_val:.2f} <span style="color:{chg_col};font-size:0.80rem;">({chg_val:+.2f}%)</span></span></div>'
                     f'{k2_banner_html}'
                     f'<span class="baro-badge badge-{style_cls}">【{smc_ui} + {chan_tag}】{tactical_tag}</span>'
                     f'<div class="baro-advice">24態劇本：{base_advice}</div>'
+                    f'</div>'
                     f'<div class="baro-sub">'
                     f'• 14K動能: <b>{mom_14k_str}</b><br>'
-                    f'• 指標: WT <span class="metric-pill">{b_res["WT快線"]:.1f}</span> ｜ RSI <span class="metric-pill">{b_res["平均RSI"]:.1f}</span> ({b_res["RSI狀態"]})<br>'
+                    f'• 指標: WT <span class="metric-pill">{wt_now:.1f}</span> ｜ RSI <span class="metric-pill">{rsi_now:.1f}</span> ({b_res["RSI狀態"]})<br>'
                     f'• 支撐: {b_res["最近支撐區"]}<br>'
                     f'• 壓力: {b_res["最近壓力區"]}'
                     f'</div></div>'
@@ -1917,6 +1974,8 @@ if auto_intel:
                         st.caption("🟢 **多方：** " + "、".join([f"{k}({v})" for k, v in bull_detail.items()]))
                     if bear_detail:
                         st.caption("🔴 **空方：** " + "、".join([f"{k}({v})" for k, v in bear_detail.items()]))
+                    if not sigs:
+                        st.caption("近 14 根 K 棒內無觸發回踩或極端動能訊號")
                     for s in sigs:
                         st.caption(f"• {s}")
             else:
@@ -2028,7 +2087,7 @@ if scan_btn:
     }
 
 # ════════════════════════════════════════════════════════════════════════════
-# 個股掃描結果表格渲染區
+# 個股掃描結果表格渲染區 (含 4 大戰術精選 KPI 看板 + 支撐壓力同表顯示)
 # ════════════════════════════════════════════════════════════════════════════
 st.subheader("📋 個股訊號掃描清單")
 
@@ -2077,10 +2136,26 @@ if "scan_cache" in st.session_state:
         vol_col_key = "日均交易量" if vol_sort_by.startswith("日均") else "當前成交量"
         df_report = df_report.sort_values(by=['Priority', vol_col_key], ascending=[False, False]).reset_index(drop=True)
 
+        # ── 4 大戰術精選迷你看板 (KPI Summary) ──
+        reso_buy_list = [r["Raw_Ticker"] for r in filtered_rows if ("中樞共振 Buy" in r["觸發指標通知"] or "OB共振支撐" in r["觸發指標通知"])]
+        dip_buy_list = [r["Raw_Ticker"] for r in filtered_rows if any(k in r["觸發指標通知"] for k in ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱"])]
+        bear_warn_list = [r["Raw_Ticker"] for r in filtered_rows if any(k in r["觸發指標通知"] for k in ["中樞共振 Sell", "OB共振壓力", "頂部預警", "WT 死叉", "多頭陷阱"])]
+        in_sup_list = [r["Raw_Ticker"] for r in filtered_rows if "⚡踩入!" in r["最近支撐區"]]
+
+        k_col1, k_col2, k_col3, k_col4 = st.columns(4)
+        with k_col1:
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#9ba2b0;">🌟 頂級共振回踩買點</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(reso_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(reso_buy_list[:4]) if reso_buy_list else "無"}</div></div>', unsafe_allow_html=True)
+        with k_col2:
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#9ba2b0;">🟢 左側恐慌/超賣抄底</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(dip_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(dip_buy_list[:4]) if dip_buy_list else "無"}</div></div>', unsafe_allow_html=True)
+        with k_col3:
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#9ba2b0;">⚡ 現價正踩入支撐區</div><div style="font-size:1.35rem;font-weight:900;color:#ffca28;">{len(in_sup_list)} 檔</div><div style="font-size:0.72rem;color:#ffd600;">{", ".join(in_sup_list[:4]) if in_sup_list else "無"}</div></div>', unsafe_allow_html=True)
+        with k_col4:
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#9ba2b0;">🔴 壓力受阻/逃頂警訊</div><div style="font-size:1.35rem;font-weight:900;color:#ff5252;">{len(bear_warn_list)} 檔</div><div style="font-size:0.72rem;color:#ff8a80;">{", ".join(bear_warn_list[:4]) if bear_warn_list else "無"}</div></div>', unsafe_allow_html=True)
+
         cols_to_show = ["標的代號", "TV圖表", "SMC 結構", "最新收盤價", "當前成交量", "日均交易量"]
         if use_fund:
             cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
-        cols_to_show.append("觸發指標通知")
+        cols_to_show.extend(["觸發指標通知", "最近支撐區", "最近壓力區"])
 
         st.success(f"🎯 個股掃描完成！共發現 **{len(df_report)}** 檔符合條件的標的 ｜ 已依 **{vol_sort_by}** 由大到小排序 (耗時: {cache['elapsed']} 秒)")
 
@@ -2094,20 +2169,13 @@ if "scan_cache" in st.session_state:
                 "當前成交量": st.column_config.NumberColumn("當前成交量", format="compact", width="small"),
                 "日均交易量": st.column_config.NumberColumn("日均交易量", format="compact", width="small"),
                 "觸發指標通知": st.column_config.TextColumn("觸發指標通知 (近 N 根 K 棒)", width="large"),
+                "最近支撐區": st.column_config.TextColumn("最近支撐區 (距離%)", width="medium"),
+                "最近壓力區": st.column_config.TextColumn("最近壓力區 (距離%)", width="medium"),
             },
             use_container_width=True,
             hide_index=True,
-            height=600
+            height=620
         )
-
-        with st.expander("📦 點此展開：各標的「最近 OB / 共振 / 中樞支撐與壓力區間」潛伏表"):
-            cols_zone = ["標的代號", "TV圖表", "最新收盤價", "SMC 結構", "最近支撐區", "最近壓力區"]
-            st.dataframe(
-                df_report[cols_zone],
-                column_config={"TV圖表": st.column_config.LinkColumn("TV看圖", display_text="🔗 開圖", width="small")},
-                use_container_width=True,
-                hide_index=True
-            )
     else:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
