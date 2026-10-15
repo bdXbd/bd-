@@ -56,7 +56,7 @@ st.markdown(
     ".news-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 15px; margin-bottom: 9px; box-shadow: 0 3px 12px rgba(0,0,0,0.22); color: #ffffff; }"
     ".news-card:hover { border-color: rgba(0,229,255,0.4); }"
     ".kpi-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; text-align: center; margin-bottom: 10px; color: #ffffff; }"
-    /* 載入動畫專用 CSS */
+    # 載入動畫專用 CSS
     "@keyframes pulse-ring { 0% { transform: scale(0.85); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.4; } 100% { transform: scale(0.85); opacity: 0.9; } }"
     "@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }"
     ".loader-hud { background: linear-gradient(135deg, #141926, #1d2538); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; color: #ffffff; box-shadow: 0 6px 20px rgba(0,0,0,0.35); }"
@@ -73,7 +73,7 @@ st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.2")
 st.caption("機構級高對比戰情版：**極速防斷線 FRED 8大總經數據 × 動態ETA載入引擎 × 精準新聞NLP判讀 × 大盤24態風向標 × 0秒即時過濾**")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 訊號清單與預設戰術組合定義
+# 訊號清單與預設戰術組合定義[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 CONFIG_FILE = "scanner_config.json"
 FAV_FILE = "favorites.txt"
@@ -171,7 +171,7 @@ def render_loader_hud(placeholder, step_title, pct, elapsed_sec, eta_sec, sub_de
     placeholder.markdown(html, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 數據獲取與 TradingView 4H 時框精準重採樣
+# 數據獲取與 TradingView 4H 時框精準重採樣[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600)
 def get_us_indices():
@@ -268,7 +268,7 @@ def get_tv_link(ticker):
     return f"https://www.tradingview.com/chart/?symbol={t}"
 
 # ════════════════════════════════════════════════════════════════════════════
-# 纏論核心引擎 (用於中樞延伸 OB 與大盤 24 態面板)
+# 纏論核心引擎 (用於中樞延伸 OB 與大盤 24 態面板)[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     n = len(close_v)
@@ -433,7 +433,7 @@ def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     return bi_arr, zs_arr, sg_arr
 
 # ════════════════════════════════════════════════════════════════════════════
-# 完整技術指標掃描引擎 (OB / OB共振 / 中樞 / 中樞共振 皆嚴格回踩確認)
+# 完整技術指標掃描引擎 (OB / OB共振 / 中樞 / 中樞共振 皆嚴格回踩確認)[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 def update_active_obs(src_obs, max_obs=5, show_overlap=True):
     act_obs = []
@@ -1068,7 +1068,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
 # 🌐 極速防斷線 FRED 8 大總經指標 + 深度新聞 NLP 情緒解讀 + 5大盤 24 態戰術引擎
 # ════════════════════════════════════════════════════════════════════════════
 def translate_and_summarize_news(title):
-    """高精度中英文財經新聞 NLP 情緒判讀與動態數字萃取引擎"""
+    """高精度中英文財經新聞 NLP 情緒判讀與動態數字萃取引擎[cite: 2]"""
     t_low = title.lower()
     topics = []
     if any(w in t_low for w in ["cpi", "consumer price", "inflation", "物價", "通膨"]):
@@ -1465,14 +1465,13 @@ def get_macro_and_barometer_with_eta(selected_tf, scan_days, strict_confirm, sho
     if "intel_mem_cache" not in st.session_state:
         st.session_state.intel_mem_cache = {}
 
-    # 若快取已存在且距離上次更新小於 15 分鐘，且 macro_cards 非空，直接 0 秒讀取
     cached_item = st.session_state.intel_mem_cache.get(cache_key)
     if cached_item and (time.time() - cached_item["ts"] < 900) and len(cached_item["data"].get("macro_cards", [])) > 0:
         return cached_item["data"]
 
     hud_box = st.empty()
     t0 = time.time()
-    est_total_sec = 5.5  # 平均首次冷啟動預估總耗時約 5.5 秒
+    est_total_sec = 5.5
 
     with st.status("🚀 正在啟動全局總經與大盤 24 態戰情引擎 (預計總耗時 ~5 秒)...", expanded=True) as status_box:
         # ── 階段 1/4：抓取 FRED 8 大官方總經指標 ──
@@ -1485,7 +1484,6 @@ def get_macro_and_barometer_with_eta(selected_tf, scan_days, strict_confirm, sho
         st.write("⏳ **[1/4]** 正在下載聯準會 FRED 8 大核心總經指標...")
         macro_cards, bull_score, bear_score, key_drivers = _cached_fred_cards_only()
         if len(macro_cards) < 4:
-            # 若抓到的項目太少，清除快取立即重試一次
             _cached_fred_cards_only.clear()
             macro_cards, bull_score, bear_score, key_drivers = _cached_fred_cards_only()
 
@@ -1769,7 +1767,7 @@ def get_macro_and_barometer_with_eta(selected_tf, scan_days, strict_confirm, sho
     return result_dict
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁側邊欄設定
+# 網頁側邊欄設定[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 user_config = load_config()
 
@@ -2175,7 +2173,6 @@ if scan_btn:
     use_fund = not scan_mode.startswith("1")
     total_cnt = len(all_tickers)
 
-    # 初始預估每檔耗時 (若開啟基本面查詢則每檔約 0.35s，僅看技術面批量約 0.08s)
     init_per_ticker = 0.35 if use_fund else 0.09
 
     for i in range(0, total_cnt, chunk_size):
@@ -2201,7 +2198,6 @@ if scan_btn:
         try:
             data = yf.download(batch, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
             for idx_b, t in enumerate(batch):
-                # 每處理 5 檔即時微調一次進度條與 ETA
                 if idx_b % 5 == 0:
                     cur_done = i + idx_b
                     el_sub = time.time() - start_time
@@ -2284,7 +2280,7 @@ if scan_btn:
     }
 
 # ════════════════════════════════════════════════════════════════════════════
-# 個股掃描結果表格渲染區 (含 4 大戰術精選 KPI 看板 + 支撐壓力同表顯示)
+# 個股掃描結果表格渲染區 (含 4 大戰術精選 KPI 看板 + 支撐壓力同表顯示)[cite: 2]
 # ════════════════════════════════════════════════════════════════════════════
 st.subheader("📋 個股訊號掃描清單")
 
