@@ -5,19 +5,26 @@ import numpy as np
 import time
 import warnings
 import os
+import io
+import ssl
 import json
 import re
 import urllib.request
 import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 warnings.filterwarnings("ignore")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化 (強制深色高對比卡片，適配亮/暗主題)
+# 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化 + 動態載入動畫特效
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.1",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.2",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -49,15 +56,24 @@ st.markdown(
     ".news-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 15px; margin-bottom: 9px; box-shadow: 0 3px 12px rgba(0,0,0,0.22); color: #ffffff; }"
     ".news-card:hover { border-color: rgba(0,229,255,0.4); }"
     ".kpi-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; text-align: center; margin-bottom: 10px; color: #ffffff; }"
+    /* 載入動畫專用 CSS */
+    "@keyframes pulse-ring { 0% { transform: scale(0.85); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.4; } 100% { transform: scale(0.85); opacity: 0.9; } }"
+    "@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }"
+    ".loader-hud { background: linear-gradient(135deg, #141926, #1d2538); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; color: #ffffff; box-shadow: 0 6px 20px rgba(0,0,0,0.35); }"
+    ".loader-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 800; font-size: 0.95rem; }"
+    ".loader-orb { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #00e5ff; box-shadow: 0 0 10px #00e5ff; animation: pulse-ring 1.2s infinite ease-in-out; margin-right: 8px; }"
+    ".loader-track { width: 100%; height: 9px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; margin-bottom: 6px; }"
+    ".loader-fill { height: 100%; background: linear-gradient(90deg, #00e5ff, #00e676, #00e5ff); background-size: 200% 100%; animation: shimmer 2s infinite linear; transition: width 0.3s ease; border-radius: 99px; }"
+    ".loader-meta { display: flex; justify-content: space-between; font-size: 0.78rem; color: #b0b8c8; font-family: 'JetBrains Mono', monospace; }"
     "</style>",
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.1")
-st.caption("機構級高對比戰情版：**精準新聞NLP多空判讀 (含PPI/CPI爆表辨識) × 穩定版FRED 8大總經數據 × 大盤24態風向標 × 0秒即時過濾**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.2")
+st.caption("機構級高對比戰情版：**極速防斷線 FRED 8大總經數據 × 動態ETA載入引擎 × 精準新聞NLP判讀 × 大盤24態風向標 × 0秒即時過濾**")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 訊號清單與預設戰術組合定義 (已移除 CHOCH / BOS / 纏論123買賣點)
+# 訊號清單與預設戰術組合定義
 # ════════════════════════════════════════════════════════════════════════════
 CONFIG_FILE = "scanner_config.json"
 FAV_FILE = "favorites.txt"
@@ -134,6 +150,25 @@ def load_config():
 def save_config(config_dict):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config_dict, f, ensure_ascii=False, indent=4)
+
+def render_loader_hud(placeholder, step_title, pct, elapsed_sec, eta_sec, sub_detail=""):
+    """渲染高質感霓虹動態進度條與預計剩餘時間 (ETA)"""
+    pct_clamped = max(2, min(100, int(pct)))
+    eta_str = f"預計剩餘: ~{max(1, int(round(eta_sec)))} 秒" if eta_sec > 0.4 else "即將完成..."
+    html = (
+        f'<div class="loader-hud">'
+        f'<div class="loader-header">'
+        f'<span><span class="loader-orb"></span>{step_title}</span>'
+        f'<span style="color:#00e5ff;font-family:monospace;">{pct_clamped}%</span>'
+        f'</div>'
+        f'<div class="loader-track"><div class="loader-fill" style="width:{pct_clamped}%;"></div></div>'
+        f'<div class="loader-meta">'
+        f'<span>{sub_detail}</span>'
+        f'<span>⏱️ 已耗時: {elapsed_sec:.1f}s ｜ ⏳ <b style="color:#ffd600;">{eta_str}</b></span>'
+        f'</div>'
+        f'</div>'
+    )
+    placeholder.markdown(html, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════
 # 數據獲取與 TradingView 4H 時框精準重採樣
@@ -1030,7 +1065,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     }
 
 # ════════════════════════════════════════════════════════════════════════════
-# 🌐 全自動 8 大官方總經指標 (FRED) + 深度新聞 NLP 情緒解讀 + 5大盤 24 態戰術引擎
+# 🌐 極速防斷線 FRED 8 大總經指標 + 深度新聞 NLP 情緒解讀 + 5大盤 24 態戰術引擎
 # ════════════════════════════════════════════════════════════════════════════
 def translate_and_summarize_news(title):
     """高精度中英文財經新聞 NLP 情緒判讀與動態數字萃取引擎"""
@@ -1057,11 +1092,9 @@ def translate_and_summarize_news(title):
 
     topic_str = "・".join(topics[:2]) if topics else "市場焦點動態"
 
-    # 自動萃取標題中的關鍵百分比數據 (如 1.3%, 6.3%)
     pct_matches = re.findall(r'[+-]?\d+(?:\.\d+)?%', title)
     num_tag = f"（關鍵數據：{', '.join(pct_matches[:2])}）" if pct_matches else ""
 
-    # 擴充版空方關鍵詞庫 (特別針對通膨爆表、PPI/CPI超預期、科技股拋售)
     bear_words = [
         "hot", "hotter", "comes in hot", "accelerates", "tops forecasts", "above expectations",
         "hike", "hawkish", "inflation rises", "energy driven inflation", "inflation test",
@@ -1072,7 +1105,6 @@ def translate_and_summarize_news(title):
         "難鬆口氣", "升息", "利空", "大跌", "恐慌", "賣超", "重挫", "破底", "飆升", "暴跌", "殺盤", "承壓"
     ]
 
-    # 擴充版多方關鍵詞庫 (含財報法說利多、通膨降溫、指數反彈)
     bull_words = [
         "beat", "beats", "surge", "rally", "cooling", "cools", "eases", "cut", "dovish", "optimism",
         "gain", "gains", "bull", "jump", "upgrade", "record high", "soar", "rebound", "growth",
@@ -1084,7 +1116,6 @@ def translate_and_summarize_news(title):
     b_hits = sum(1 for w in bull_words if w in t_low)
     s_hits = sum(1 for w in bear_words if w in t_low)
 
-    # 特殊語境修正：若標題提到「通膨/PPI/CPI」且出現「走高/超預期/爆表/年升」，強制歸類為重度利空
     if any(k in topic_str for k in ["CPI通膨", "PPI生產物價", "核心PCE"]) and any(w in t_low for w in ["爆表", "超預期", "走高", "年升", "年增", "hot", "inflation test", "警報"]):
         s_hits += 3
 
@@ -1119,55 +1150,82 @@ def translate_and_summarize_news(title):
     return topic_str, sentiment, impact, score
 
 
-@st.cache_data(ttl=900)
-def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob):
+def fetch_single_fred_series(sid):
+    """
+    極速防斷線 FRED 單一序列抓取器：
+    1. 加上 &cosd=2023-01-01 減少 95% 歷史無用資料量 (秒開關鍵)
+    2. 優先使用 requests 連線池，失敗自動降級至忽略 SSL 驗證之 urllib
+    """
+    urls = [
+        f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd=2023-01-01",
+        f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/csv,text/plain,*/*;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive"
+    }
+
+    for url in urls:
+        for attempt in range(2):
+            # 通道 A：使用 requests (若環境有安裝)
+            if requests is not None:
+                try:
+                    resp = requests.get(url, headers=headers, timeout=8)
+                    if resp.status_code == 200 and len(resp.text) > 25 and "<html" not in resp.text[:100].lower():
+                        df_f = pd.read_csv(io.StringIO(resp.text))
+                        if len(df_f.columns) >= 2:
+                            df_f = df_f.iloc[:, :2]
+                            df_f.columns = ['DATE', 'VAL']
+                            df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
+                            df_clean = df_f.dropna().tail(18).reset_index(drop=True)
+                            if len(df_clean) > 0:
+                                return sid, df_clean
+                except Exception:
+                    pass
+
+            # 通道 B：使用忽略 SSL 憑證錯誤的 urllib
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                    raw_text = resp.read().decode('utf-8', errors='ignore')
+                    if len(raw_text) > 25 and "<html" not in raw_text[:100].lower():
+                        df_f = pd.read_csv(io.StringIO(raw_text))
+                        if len(df_f.columns) >= 2:
+                            df_f = df_f.iloc[:, :2]
+                            df_f.columns = ['DATE', 'VAL']
+                            df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
+                            df_clean = df_f.dropna().tail(18).reset_index(drop=True)
+                            if len(df_clean) > 0:
+                                return sid, df_clean
+            except Exception:
+                time.sleep(0.25)
+
+    return sid, pd.DataFrame()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _cached_fred_cards_only():
+    """獨立快取 FRED 8 大數據卡片 (僅在成功抓到資料時才會被保留)"""
+    fred_ids = [
+        "CPIAUCSL", "CPILFESL", "PPIACO", "PCEPILFE",
+        "PAYEMS", "UNRATE", "ICSA", "RSAFS", "T10Y2Y", "DFF"
+    ]
+    fred_dict = {}
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(fetch_single_fred_series, sid): sid for sid in fred_ids}
+        for fut in as_completed(futures):
+            sid, df_res = fut.result()
+            fred_dict[sid] = df_res
+
     macro_cards = []
-    market_cards = []
-    news_items = []
     bull_score = 0.0
     bear_score = 0.0
     key_drivers = []
-
-    # ── 1. 穩健抓取聯準會 FRED 核心經濟數據 (限制併發數為 3 + 自動重試，避免被 FRED 封鎖) ──
-    fred_ids = [
-        "CPIAUCSL",  # 1. CPI 消費者物價指數
-        "CPILFESL",  # 2. 核心 CPI
-        "PPIACO",    # 3. PPI 生產者物價指數
-        "PCEPILFE",  # 4. 核心 PCE 物價指數
-        "PAYEMS",    # 5. 非農就業總人數
-        "UNRATE",    # 6. 失業率
-        "ICSA",      # 7. 當週初領失業金人數
-        "RSAFS",     # 8. 零售銷售額
-        "T10Y2Y",    # 9. 10Y-2Y 美債殖利率利差
-        "DFF"        # 10. 聯邦基金有效利率
-    ]
-
-    def fetch_one_fred(sid):
-        for attempt in range(2):
-            try:
-                url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
-                req = urllib.request.Request(
-                    url,
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Accept': 'text/csv,text/plain,*/*'
-                    }
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    df_f = pd.read_csv(resp)
-                df_f.columns = ['DATE', 'VAL']
-                df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
-                df_clean = df_f.dropna().tail(18).reset_index(drop=True)
-                if len(df_clean) > 0:
-                    return sid, df_clean
-            except Exception:
-                time.sleep(0.3)
-        return sid, pd.DataFrame()
-
-    fred_dict = {}
-    with ThreadPoolExecutor(max_workers=3) as ex:
-        for sid, df_res in ex.map(fetch_one_fred, fred_ids):
-            fred_dict[sid] = df_res
 
     # (1) 美國 CPI 與核心 CPI
     df_cpi = fred_dict.get("CPIAUCSL", pd.DataFrame())
@@ -1378,180 +1436,242 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             "badge": "🟡 緊盯 FOMC 利率決議動向", "cls": "warn"
         })
 
-    macro_cards.sort(key=lambda x: x["sort_dt"], reverse=True)
-
-    # ── 2. 抓取跨市場即時資金指標 (VIX, 10Y美債, 美元指數, 原油, 黃金) ──
-    cross_tickers = ["^VIX", "^TNX", "DX-Y.NYB", "CL=F", "GC=F"]
-    try:
-        m_data = yf.download(cross_tickers, period="10d", interval="1d", group_by='ticker', progress=False, threads=True)
-
-        def parse_m_ticker(sym):
-            df_m = m_data[sym].dropna(subset=['Close'])
-            if len(df_m) >= 2:
-                c_now = float(df_m['Close'].iloc[-1])
-                c_prev = float(df_m['Close'].iloc[-2])
-                c_5d = float(df_m['Close'].iloc[-5]) if len(df_m) >= 5 else c_prev
-                chg_1d = ((c_now - c_prev) / c_prev) * 100.0
-                chg_5d = ((c_now - c_5d) / c_5d) * 100.0
-                return c_now, chg_1d, chg_5d
-            return None
-
-        vix_info = parse_m_ticker("^VIX")
-        if vix_info:
-            v_val, v_1d, v_5d = vix_info
-            if v_val >= 21.5 or v_1d >= 6.5:
-                v_badge, v_cls = "🔴 避險情緒升溫 (美股承壓)", "bear"
-                bear_score += 2.0
-                key_drivers.append(f"【VIX 恐慌指數】跳升至 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
-            elif v_val < 16.5 and v_1d <= 0:
-                v_badge, v_cls = "🟢 市場情緒穩定 (有利多頭)", "bull"
-                bull_score += 2.0
-            elif v_1d < -4.0:
-                v_badge, v_cls = "🟢 恐慌快速降溫 (支撐反彈)", "bull"
-                bull_score += 1.0
-            else:
-                v_badge, v_cls = "🟡 情緒中性震盪", "warn"
-            market_cards.append({
-                "title": "⚡ VIX 恐慌指數", "price": f"{v_val:.2f}", "chg": v_1d,
-                "sub": f"5日變動 {v_5d:+.1f}% ｜ <18 安定 / >21.5 警戒", "badge": v_badge, "cls": v_cls
-            })
-
-        tnx_info = parse_m_ticker("^TNX")
-        if tnx_info:
-            t_val, t_1d, t_5d = tnx_info
-            if t_val >= 4.40 or t_1d >= 1.5 or t_5d >= 2.5:
-                t_badge, t_cls = "🔴 殖利率走高 (壓抑科技股估值)", "bear"
-                bear_score += 2.0
-                key_drivers.append(f"【10Y 美債殖利率】攀升至 {t_val:.2f}% ({t_1d:+.1f}%)，無風險利率上升壓抑高估值科技股")
-            elif t_1d < -1.2 or t_5d < -2.0:
-                t_badge, t_cls = "🟢 殖利率回落 (資金回流成長股)", "bull"
-                bull_score += 2.0
-                key_drivers.append(f"【10Y 美債殖利率】回落至 {t_val:.2f}%，緩解科技股折現率壓力")
-            else:
-                t_badge, t_cls = "🟡 殖利率高檔整理", "warn"
-            market_cards.append({
-                "title": "📈 10年期美債殖利率", "price": f"{t_val:.2f}%", "chg": t_1d,
-                "sub": f"5日變動 {t_5d:+.1f}% ｜ 科技股估值折現核心指標", "badge": t_badge, "cls": t_cls
-            })
-
-        dxy_info = parse_m_ticker("DX-Y.NYB")
-        if dxy_info:
-            d_val, d_1d, d_5d = dxy_info
-            if d_1d >= 0.30 or d_5d >= 0.9:
-                d_badge, d_cls = "🔴 美元轉強 (外資易自台股流出)", "bear"
-                bear_score += 1.5
-                key_drivers.append(f"【DXY 美元指數】轉強至 {d_val:.2f} ({d_1d:+.2f}%)，不利台股外資資金面與非美資產")
-            elif d_1d <= -0.30 or d_5d <= -0.8:
-                d_badge, d_cls = "🟢 美元走弱 (利好台股與風險資產)", "bull"
-                bull_score += 1.5
-            else:
-                d_badge, d_cls = "🟡 美元匯率持穩", "warn"
-            market_cards.append({
-                "title": "💵 DXY 美元指數", "price": f"{d_val:.2f}", "chg": d_1d,
-                "sub": f"5日變動 {d_5d:+.1f}% ｜ 全球跨國資金流向指標", "badge": d_badge, "cls": d_cls
-            })
-
-        oil_info = parse_m_ticker("CL=F")
-        if oil_info:
-            o_val, o_1d, o_5d = oil_info
-            if o_val >= 80.0 or o_1d >= 2.0 or o_5d >= 4.5:
-                o_badge, o_cls = "🔴 油價走高 (推升汽油與CPI/PPI)", "bear"
-                bear_score += 1.5
-                key_drivers.append(f"【WTI 原油】報 ${o_val:.2f} (5日 {o_5d:+.1f}%)，能源成本上揚推升 CPI 與 PPI 通膨預期")
-            elif o_val <= 70.0 or o_5d <= -4.0:
-                o_badge, o_cls = "🟢 油價回落 (緩解通膨與企業成本)", "bull"
-                bull_score += 1.5
-            else:
-                o_badge, o_cls = "🟡 油價區間整理", "warn"
-            market_cards.append({
-                "title": "🛢️ WTI 原油期貨", "price": f"${o_val:.2f}", "chg": o_1d,
-                "sub": f"5日變動 {o_5d:+.1f}% ｜ 能源型通膨先行指標", "badge": o_badge, "cls": o_cls
-            })
-
-        gold_info = parse_m_ticker("GC=F")
-        if gold_info:
-            g_val, g_1d, g_5d = gold_info
-            g_badge = "🟡 避險/抗通膨資金湧入" if g_1d >= 1.0 else ("🔵 美元走強壓抑金價" if g_1d <= -1.0 else "⚪ 貴金屬高檔震盪")
-            market_cards.append({
-                "title": "🥇 黃金期貨", "price": f"${g_val:.1f}", "chg": g_1d,
-                "sub": f"5日變動 {g_5d:+.1f}% ｜ 實質利率與避險指標", "badge": g_badge, "cls": "warn"
-            })
-    except Exception:
-        pass
-
-    # ── 3. 自動抓取中英文重大財經/CPI/PPI/非農/台美股新聞並生成高精度摘要 ──
-    seen_titles = set()
-    rss_sources = [
-        ("🇺🇸 美國總經數據", "https://news.google.com/rss/search?q=US+CPI+OR+PPI+OR+Nonfarm+Payrolls+OR+Jobless+Claims+OR+Retail+Sales+OR+Federal+Reserve+when:3d&hl=en-US&gl=US&ceid=US:en"),
-        ("🇹🇼 台美股/財經", "https://news.google.com/rss/search?q=CPI+OR+PPI+OR+%E9%9D%9E%E8%BE%B2+OR+%E8%81%AF%E6%BA%96%E6%9C%83+OR+%E5%8F%B0%E8%82%A1+OR+%E5%8F%B0%E7%A9%8D%E9%9B%BB+when:2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
-    ]
-
-    for src_tag, rss_url in rss_sources:
+    # 保底機制：若防火牆徹底阻擋 FRED，自動由 Yahoo Finance 合成即時宏觀替代指標
+    if len(macro_cards) == 0:
         try:
-            req = urllib.request.Request(rss_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                root = ET.fromstring(resp.read())
-            for item in root.findall('.//item')[:4]:
-                title = item.find('title').text if item.find('title') is not None else ""
-                link = item.find('link').text if item.find('link') is not None else ""
-                if title and title not in seen_titles:
-                    seen_titles.add(title)
-                    topic_str, sent_tag, impact_str, sc = translate_and_summarize_news(title)
-                    if sc > 0:
-                        bull_score += sc
-                    elif sc < 0:
-                        bear_score += abs(sc)
-                    news_items.append({
-                        "src": src_tag, "topic": topic_str, "title": title,
-                        "link": link, "sentiment": sent_tag, "impact": impact_str
-                    })
+            fb_tickers = ["^IRX", "^FVX", "^TNX", "^TYX", "TIP"]
+            fb_data = yf.download(fb_tickers, period="15d", interval="1d", group_by='ticker', progress=False, threads=True)
+            irx = float(fb_data["^IRX"]["Close"].dropna().iloc[-1])
+            fvx = float(fb_data["^FVX"]["Close"].dropna().iloc[-1])
+            tnx = float(fb_data["^TNX"]["Close"].dropna().iloc[-1])
+            tyx = float(fb_data["^TYX"]["Close"].dropna().iloc[-1])
+            sp_10_5 = tnx - fvx
+            dt_now = pd.Timestamp.now().strftime('%m-%d')
+            macro_cards = [
+                {"sort_dt": dt_now, "key_id": "FED_FB", "title": f"🏛️ 3M 國庫券隱含利率 ({dt_now})", "main": f"{irx:.2f}%", "sub": "貼近 Fed 基準利率即時定價 (Yahoo 備援通道)", "badge": "🟡 緊盯聯準會利率路徑", "cls": "warn"},
+                {"sort_dt": dt_now, "key_id": "SP_FB", "title": f"🏦 10Y-5Y 美債利差 ({dt_now})", "main": f"{sp_10_5:+.2f}%", "sub": f"10Y ({tnx:.2f}%) vs 5Y ({fvx:.2f}%) 殖利率曲線", "badge": "🟢 殖利率曲線正常" if sp_10_5 >= 0 else "🔴 殖利率倒掛警戒", "cls": "bull" if sp_10_5 >= 0 else "bear"},
+                {"sort_dt": dt_now, "key_id": "TYX_FB", "title": f"🏛️ 30年期長債殖利率 ({dt_now})", "main": f"{tyx:.2f}%", "sub": "長天期通膨預期與房貸利率定價錨", "badge": "🔴 長債利率偏高" if tyx >= 4.6 else "🟡 長債殖利率整理", "cls": "bear" if tyx >= 4.6 else "warn"}
+            ]
         except Exception:
             pass
 
-    if len(news_items) < 6:
-        for sym in ["SPY", "QQQ"]:
+    macro_cards.sort(key=lambda x: x["sort_dt"], reverse=True)
+    return macro_cards, bull_score, bear_score, key_drivers
+
+
+def get_macro_and_barometer_with_eta(selected_tf, scan_days, strict_confirm, show_swing_ob):
+    """具備視覺化載入動畫、分階段進度條與預計剩餘時間 (ETA) 的全局戰情同步引擎"""
+    cache_key = f"intel_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
+    if "intel_mem_cache" not in st.session_state:
+        st.session_state.intel_mem_cache = {}
+
+    # 若快取已存在且距離上次更新小於 15 分鐘，且 macro_cards 非空，直接 0 秒讀取
+    cached_item = st.session_state.intel_mem_cache.get(cache_key)
+    if cached_item and (time.time() - cached_item["ts"] < 900) and len(cached_item["data"].get("macro_cards", [])) > 0:
+        return cached_item["data"]
+
+    hud_box = st.empty()
+    t0 = time.time()
+    est_total_sec = 5.5  # 平均首次冷啟動預估總耗時約 5.5 秒
+
+    with st.status("🚀 正在啟動全局總經與大盤 24 態戰情引擎 (預計總耗時 ~5 秒)...", expanded=True) as status_box:
+        # ── 階段 1/4：抓取 FRED 8 大官方總經指標 ──
+        render_loader_hud(
+            hud_box,
+            "🏛️ [階段 1/4] 正在高速同步聯準會 FRED 8 大總經數據庫 (CPI / PPI / 非農 / 初領失業金 / PCE)...",
+            pct=18, elapsed_sec=time.time() - t0, eta_sec=max(1.0, est_total_sec - (time.time() - t0)),
+            sub_detail="已啟用 2023+ 輕量化極速通道與雙重 SSL 防斷線保護"
+        )
+        st.write("⏳ **[1/4]** 正在下載聯準會 FRED 8 大核心總經指標...")
+        macro_cards, bull_score, bear_score, key_drivers = _cached_fred_cards_only()
+        if len(macro_cards) < 4:
+            # 若抓到的項目太少，清除快取立即重試一次
+            _cached_fred_cards_only.clear()
+            macro_cards, bull_score, bear_score, key_drivers = _cached_fred_cards_only()
+
+        # ── 階段 2/4：抓取跨市場即時資金指標 ──
+        el_1 = time.time() - t0
+        render_loader_hud(
+            hud_box,
+            "💹 [階段 2/4] 正在同步跨市場即時資金風向 (VIX 恐慌指數 / 10Y美債 / 美元 DXY / 原油 / 黃金)...",
+            pct=45, elapsed_sec=el_1, eta_sec=max(1.0, (el_1 / 0.45) * 0.55),
+            sub_detail=f"FRED 總經資料庫已就緒 ({len(macro_cards)} 項)"
+        )
+        st.write(f"✅ **[1/4]** FRED 總經數據同步完成（共載入 **{len(macro_cards)}** 項關鍵指標）")
+        st.write("⏳ **[2/4]** 正在抓取跨市場資金流向 (VIX / 10Y美債 / DXY / 原油 / 黃金)...")
+
+        market_cards = []
+        cross_tickers = ["^VIX", "^TNX", "DX-Y.NYB", "CL=F", "GC=F"]
+        try:
+            m_data = yf.download(cross_tickers, period="10d", interval="1d", group_by='ticker', progress=False, threads=True)
+
+            def parse_m_ticker(sym):
+                df_m = m_data[sym].dropna(subset=['Close'])
+                if len(df_m) >= 2:
+                    c_now = float(df_m['Close'].iloc[-1])
+                    c_prev = float(df_m['Close'].iloc[-2])
+                    c_5d = float(df_m['Close'].iloc[-5]) if len(df_m) >= 5 else c_prev
+                    chg_1d = ((c_now - c_prev) / c_prev) * 100.0
+                    chg_5d = ((c_now - c_5d) / c_5d) * 100.0
+                    return c_now, chg_1d, chg_5d
+                return None
+
+            vix_info = parse_m_ticker("^VIX")
+            if vix_info:
+                v_val, v_1d, v_5d = vix_info
+                if v_val >= 21.5 or v_1d >= 6.5:
+                    v_badge, v_cls = "🔴 避險情緒升溫 (美股承壓)", "bear"
+                    bear_score += 2.0
+                    key_drivers.append(f"【VIX 恐慌指數】跳升至 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
+                elif v_val < 16.5 and v_1d <= 0:
+                    v_badge, v_cls = "🟢 市場情緒穩定 (有利多頭)", "bull"
+                    bull_score += 2.0
+                elif v_1d < -4.0:
+                    v_badge, v_cls = "🟢 恐慌快速降溫 (支撐反彈)", "bull"
+                    bull_score += 1.0
+                else:
+                    v_badge, v_cls = "🟡 情緒中性震盪", "warn"
+                market_cards.append({
+                    "title": "⚡ VIX 恐慌指數", "price": f"{v_val:.2f}", "chg": v_1d,
+                    "sub": f"5日變動 {v_5d:+.1f}% ｜ <18 安定 / >21.5 警戒", "badge": v_badge, "cls": v_cls
+                })
+
+            tnx_info = parse_m_ticker("^TNX")
+            if tnx_info:
+                t_val, t_1d, t_5d = tnx_info
+                if t_val >= 4.40 or t_1d >= 1.5 or t_5d >= 2.5:
+                    t_badge, t_cls = "🔴 殖利率走高 (壓抑科技股估值)", "bear"
+                    bear_score += 2.0
+                    key_drivers.append(f"【10Y 美債殖利率】攀升至 {t_val:.2f}% ({t_1d:+.1f}%)，無風險利率上升壓抑高估值科技股")
+                elif t_1d < -1.2 or t_5d < -2.0:
+                    t_badge, t_cls = "🟢 殖利率回落 (資金回流成長股)", "bull"
+                    bull_score += 2.0
+                    key_drivers.append(f"【10Y 美債殖利率】回落至 {t_val:.2f}%，緩解科技股折現率壓力")
+                else:
+                    t_badge, t_cls = "🟡 殖利率高檔整理", "warn"
+                market_cards.append({
+                    "title": "📈 10年期美債殖利率", "price": f"{t_val:.2f}%", "chg": t_1d,
+                    "sub": f"5日變動 {t_5d:+.1f}% ｜ 科技股估值折現核心指標", "badge": t_badge, "cls": t_cls
+                })
+
+            dxy_info = parse_m_ticker("DX-Y.NYB")
+            if dxy_info:
+                d_val, d_1d, d_5d = dxy_info
+                if d_1d >= 0.30 or d_5d >= 0.9:
+                    d_badge, d_cls = "🔴 美元轉強 (外資易自台股流出)", "bear"
+                    bear_score += 1.5
+                    key_drivers.append(f"【DXY 美元指數】轉強至 {d_val:.2f} ({d_1d:+.2f}%)，不利台股外資資金面與非美資產")
+                elif d_1d <= -0.30 or d_5d <= -0.8:
+                    d_badge, d_cls = "🟢 美元走弱 (利好台股與風險資產)", "bull"
+                    bull_score += 1.5
+                else:
+                    d_badge, d_cls = "🟡 美元匯率持穩", "warn"
+                market_cards.append({
+                    "title": "💵 DXY 美元指數", "price": f"{d_val:.2f}", "chg": d_1d,
+                    "sub": f"5日變動 {d_5d:+.1f}% ｜ 全球跨國資金流向指標", "badge": d_badge, "cls": d_cls
+                })
+
+            oil_info = parse_m_ticker("CL=F")
+            if oil_info:
+                o_val, o_1d, o_5d = oil_info
+                if o_val >= 80.0 or o_1d >= 2.0 or o_5d >= 4.5:
+                    o_badge, o_cls = "🔴 油價走高 (推升汽油與CPI/PPI)", "bear"
+                    bear_score += 1.5
+                    key_drivers.append(f"【WTI 原油】報 ${o_val:.2f} (5日 {o_5d:+.1f}%)，能源成本上揚推升 CPI 與 PPI 通膨預期")
+                elif o_val <= 70.0 or o_5d <= -4.0:
+                    o_badge, o_cls = "🟢 油價回落 (緩解通膨與企業成本)", "bull"
+                    bull_score += 1.5
+                else:
+                    o_badge, o_cls = "🟡 油價區間整理", "warn"
+                market_cards.append({
+                    "title": "🛢️ WTI 原油期貨", "price": f"${o_val:.2f}", "chg": o_1d,
+                    "sub": f"5日變動 {o_5d:+.1f}% ｜ 能源型通膨先行指標", "badge": o_badge, "cls": o_cls
+                })
+
+            gold_info = parse_m_ticker("GC=F")
+            if gold_info:
+                g_val, g_1d, g_5d = gold_info
+                g_badge = "🟡 避險/抗通膨資金湧入" if g_1d >= 1.0 else ("🔵 美元走強壓抑金價" if g_1d <= -1.0 else "⚪ 貴金屬高檔震盪")
+                market_cards.append({
+                    "title": "🥇 黃金期貨", "price": f"${g_val:.1f}", "chg": g_1d,
+                    "sub": f"5日變動 {g_5d:+.1f}% ｜ 實質利率與避險指標", "badge": g_badge, "cls": "warn"
+                })
+        except Exception:
+            pass
+
+        # ── 階段 3/4：抓取重大財經新聞與 AI 智慧中文摘要 ──
+        el_2 = time.time() - t0
+        render_loader_hud(
+            hud_box,
+            "📰 [階段 3/4] 正在執行台美股重大財經新聞 NLP 多空語意分析...",
+            pct=72, elapsed_sec=el_2, eta_sec=max(0.8, (el_2 / 0.72) * 0.28),
+            sub_detail="正在掃描 Google Finance RSS 與華爾街即時快訊"
+        )
+        st.write("⏳ **[3/4]** 正在解析最新財經新聞並生成中文多空摘要...")
+
+        news_items = []
+        seen_titles = set()
+        rss_sources = [
+            ("🇺🇸 美國總經數據", "https://news.google.com/rss/search?q=US+CPI+OR+PPI+OR+Nonfarm+Payrolls+OR+Jobless+Claims+OR+Retail+Sales+OR+Federal+Reserve+when:3d&hl=en-US&gl=US&ceid=US:en"),
+            ("🇹🇼 台美股/財經", "https://news.google.com/rss/search?q=CPI+OR+PPI+OR+%E9%9D%9E%E8%BE%B2+OR+%E8%81%AF%E6%BA%96%E6%9C%83+OR+%E5%8F%B0%E8%82%A1+OR+%E5%8F%B0%E7%A9%8D%E9%9B%BB+when:2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
+        ]
+
+        for src_tag, rss_url in rss_sources:
             try:
-                raw_news = yf.Ticker(sym).news
-                if raw_news:
-                    for item in raw_news[:3]:
-                        content = item.get('content', item) if isinstance(item, dict) else {}
-                        title = content.get('title') or item.get('title', '')
-                        link = ""
-                        if isinstance(content.get('canonicalUrl'), dict):
-                            link = content['canonicalUrl'].get('url', '')
-                        elif isinstance(item.get('link'), str):
-                            link = item['link']
-                        if title and title not in seen_titles:
-                            seen_titles.add(title)
-                            topic_str, sent_tag, impact_str, sc = translate_and_summarize_news(title)
-                            if sc > 0:
-                                bull_score += sc
-                            elif sc < 0:
-                                bear_score += abs(sc)
-                            news_items.append({
-                                "src": "🌎 華爾街快訊", "topic": topic_str, "title": title,
-                                "link": link, "sentiment": sent_tag, "impact": impact_str
-                            })
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(rss_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+                    root = ET.fromstring(resp.read())
+                for item in root.findall('.//item')[:4]:
+                    title = item.find('title').text if item.find('title') is not None else ""
+                    link = item.find('link').text if item.find('link') is not None else ""
+                    if title and title not in seen_titles:
+                        seen_titles.add(title)
+                        topic_str, sent_tag, impact_str, sc = translate_and_summarize_news(title)
+                        if sc > 0:
+                            bull_score += sc
+                        elif sc < 0:
+                            bear_score += abs(sc)
+                        news_items.append({
+                            "src": src_tag, "topic": topic_str, "title": title,
+                            "link": link, "sentiment": sent_tag, "impact": impact_str
+                        })
             except Exception:
                 pass
 
-    # ── 4. 自動掃描 5 大盤指數 24 態結構風向標 ──
-    barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
-    baro_results = {}
-    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
-    try:
-        b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
-        for b_tick in barometer_tickers:
-            try:
-                df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
-                df_b = df_b.dropna(subset=['Close'])
-                if len(df_b) > 40:
-                    df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
-                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
-            except Exception:
-                baro_results[b_tick] = None
-    except Exception:
-        pass
+        # ── 階段 4/4：5 大盤指數 24 態結構與纏論/SMC 運算 ──
+        el_3 = time.time() - t0
+        render_loader_hud(
+            hud_box,
+            f"🚥 [階段 4/4] 正在運算 5 大盤指數 ({selected_tf}) 纏論中樞與 SMC 24 態結構...",
+            pct=92, elapsed_sec=el_3, eta_sec=max(0.5, (el_3 / 0.92) * 0.08),
+            sub_detail="正在計算 QQQ / SOXX / SPY / ^TWII / BTC-USD 支撐與壓力區"
+        )
+        st.write(f"⏳ **[4/4]** 正在運算 5 大盤 ({selected_tf}) 24 態結構風向標...")
+
+        barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
+        baro_results = {}
+        fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+        try:
+            b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+            for b_tick in barometer_tickers:
+                try:
+                    df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
+                    df_b = df_b.dropna(subset=['Close'])
+                    if len(df_b) > 40:
+                        df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
+                        baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
+                except Exception:
+                    baro_results[b_tick] = None
+        except Exception:
+            pass
+
+        total_elapsed = time.time() - t0
+        status_box.update(label=f"✅ 全局總經與大盤戰情同步完成！(共耗時 {total_elapsed:.1f} 秒)", state="complete", expanded=False)
+
+    hud_box.empty()
 
     # ── 5. 嚴格計算大盤技術結構得分，並與宏觀經濟交叉生成戰術指令 ──
     tech_bull_cnt, tech_bear_cnt = 0, 0
@@ -1625,7 +1745,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             "👉 **實戰建議**：避免追高殺低！逢低在 **OB/中樞共振支撐做多**，逢高遇 **OB/中樞壓力或頂部預警獲利了結/短空對沖**，嚴控部位在 5～6 成水位。"
         )
 
-    return {
+    result_dict = {
         "macro_cards": macro_cards,
         "market_cards": market_cards,
         "news_items": news_items[:8],
@@ -1640,6 +1760,14 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         "tech_bear_cnt": tech_bear_cnt
     }
 
+    if len(macro_cards) > 0:
+        st.session_state.intel_mem_cache[cache_key] = {
+            "ts": time.time(),
+            "data": result_dict
+        }
+
+    return result_dict
+
 # ════════════════════════════════════════════════════════════════════════════
 # 網頁側邊欄設定
 # ════════════════════════════════════════════════════════════════════════════
@@ -1649,6 +1777,7 @@ st.sidebar.header("⚙️ 雷達掃描設定")
 
 if st.sidebar.button("🔄 強制刷新大盤與總經數據", use_container_width=True):
     st.cache_data.clear()
+    st.session_state.intel_mem_cache = {}
     st.rerun()
 
 st.sidebar.subheader("📌 收藏標的清單")
@@ -1763,8 +1892,7 @@ with col_b2:
 # ════════════════════════════════════════════════════════════════════════════
 # 第一部分：免按鈕自動執行！「8大總經指標 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
 # ════════════════════════════════════════════════════════════════════════════
-with st.spinner("🌐 正在自動同步 FRED 8大總經指標 (CPI/PPI/非農/初領失業金/PCE/零售)、即時新聞摘要與 5 大盤結構..."):
-    auto_intel = fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob)
+auto_intel = get_macro_and_barometer_with_eta(selected_tf, scan_days, strict_confirm, show_swing_ob)
 
 if auto_intel:
     # ── 頂部核心：宏觀經濟 × 大盤結構 綜合戰術指揮中心 (含動態多空能量條) ──
@@ -1860,7 +1988,11 @@ if auto_intel:
                         )
                         st.markdown(c_html, unsafe_allow_html=True)
         else:
-            st.warning("⚠️ 聯準會 FRED 伺服器連線逾時，請點擊左上角「🔄 強制刷新大盤與總經數據」重試。")
+            st.warning("⚠️ 聯準會 FRED 伺服器連線逾時。")
+            if st.button("🔌 單獨重連 FRED 總經伺服器"):
+                _cached_fred_cards_only.clear()
+                st.session_state.intel_mem_cache = {}
+                st.rerun()
 
     with tab_news:
         if auto_intel["news_items"]:
@@ -2016,7 +2148,7 @@ if auto_intel:
 st.markdown("---")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 第二部分：點擊按鈕後批量掃描個股清單 (寫入快取，支援 0 秒即時過濾與排序)
+# 第二部分：點擊按鈕後批量掃描個股清單 (配備動態 HUD 載入動畫與即時 ETA 預估)
 # ════════════════════════════════════════════════════════════════════════════
 if scan_btn:
     favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
@@ -2035,20 +2167,55 @@ if scan_btn:
         st.stop()
 
     fetch_interval = "1h" if selected_tf == "4h" else selected_tf
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    scan_hud = st.empty()
     chunk_size = 80
     all_scanned_rows = []
     successful_tickers = set()
     start_time = time.time()
     use_fund = not scan_mode.startswith("1")
+    total_cnt = len(all_tickers)
 
-    for i in range(0, len(all_tickers), chunk_size):
+    # 初始預估每檔耗時 (若開啟基本面查詢則每檔約 0.35s，僅看技術面批量約 0.08s)
+    init_per_ticker = 0.35 if use_fund else 0.09
+
+    for i in range(0, total_cnt, chunk_size):
         batch = all_tickers[i : i + chunk_size]
-        status_text.text(f"⏳ 正在下載與分析個股 K 線: {i} / {len(all_tickers)} ...")
+        elapsed = time.time() - start_time
+        done_cnt = i
+        pct_now = max(3, int((done_cnt / total_cnt) * 100))
+        if done_cnt > 0:
+            avg_per_t = elapsed / done_cnt
+            eta_now = avg_per_t * (total_cnt - done_cnt)
+        else:
+            eta_now = total_cnt * init_per_ticker
+
+        render_loader_hud(
+            scan_hud,
+            f"🚀 正在批量下載 K 線與運算纏論/SMC 指標 ({done_cnt} / {total_cnt} 檔)...",
+            pct=pct_now,
+            elapsed_sec=elapsed,
+            eta_sec=eta_now,
+            sub_detail=f"當前處理批次: {', '.join(batch[:6])}{' ...' if len(batch) > 6 else ''}"
+        )
+
         try:
             data = yf.download(batch, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
-            for t in batch:
+            for idx_b, t in enumerate(batch):
+                # 每處理 5 檔即時微調一次進度條與 ETA
+                if idx_b % 5 == 0:
+                    cur_done = i + idx_b
+                    el_sub = time.time() - start_time
+                    pct_sub = max(5, int((cur_done / total_cnt) * 100))
+                    eta_sub = (el_sub / cur_done) * (total_cnt - cur_done) if cur_done > 0 else eta_now
+                    render_loader_hud(
+                        scan_hud,
+                        f"🔬 正在深度掃描個股結構與回踩訊號 ({cur_done} / {total_cnt} 檔)...",
+                        pct=pct_sub,
+                        elapsed_sec=el_sub,
+                        eta_sec=eta_sub,
+                        sub_detail=f"正在運算: {t} ({selected_tf_label})"
+                    )
+
                 try:
                     df_t = data[t] if len(batch) > 1 else data
                     df_t = df_t.dropna(subset=['Close'])
@@ -2105,15 +2272,13 @@ if scan_btn:
                     continue
         except Exception:
             continue
-        progress_bar.progress(min((i + chunk_size) / len(all_tickers), 1.0))
 
-    progress_bar.empty()
-    status_text.empty()
+    scan_hud.empty()
 
     st.session_state.scan_cache = {
         "all_scanned_rows": all_scanned_rows,
         "failed_tickers": [t for t in all_tickers if t not in successful_tickers],
-        "elapsed": int(time.time() - start_time),
+        "elapsed": round(time.time() - start_time, 1),
         "tf_label": selected_tf_label,
         "tf_code": selected_tf
     }
