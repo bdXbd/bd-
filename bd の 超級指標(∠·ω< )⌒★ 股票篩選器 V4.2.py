@@ -24,9 +24,7 @@ st.set_page_config(
 
 st.markdown(
     "<style>"
-    /* 全域字體與間距微調 */
     ".block-container { padding-top: 1.5rem; padding-bottom: 2rem; }"
-    /* 大盤與總經玻璃擬態卡片 */
     ".baro-card { background: linear-gradient(145deg, rgba(26,30,41,0.95), rgba(16,19,26,0.98)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 14px; margin-bottom: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.35); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease; min-height: 215px; display: flex; flex-direction: column; justify-content: space-between; }"
     ".baro-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.55); border-color: rgba(255,255,255,0.18); }"
     ".macro-card-sm { min-height: 118px !important; }"
@@ -44,7 +42,6 @@ st.markdown(
     ".baro-advice { font-size: 0.84rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }"
     ".baro-sub { font-size: 0.74rem; color: #a3aab8; line-height: 1.52; }"
     ".metric-pill { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; font-weight: 600; }"
-    /* 頂部戰術決策中心與能量條 */
     ".strategy-box { background: linear-gradient(135deg, rgba(19,24,36,0.98), rgba(28,36,52,0.98)); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }"
     ".gauge-wrap { width: 100%; height: 10px; background: rgba(255,82,82,0.35); border-radius: 99px; overflow: hidden; margin: 10px 0 6px 0; display: flex; border: 1px solid rgba(255,255,255,0.12); }"
     ".gauge-bull { height: 100%; background: linear-gradient(90deg, #00c853, #00e676); transition: width 0.4s ease; }"
@@ -1535,7 +1532,6 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             chan_cls = res["Chan_Cls"]
             wt_now = res["WT快線"]
             rsi_now = res["平均RSI"]
-            # 只有 SMC 為綠BOS/綠CHOCH 且纏論非賣點、動能未轉弱才算真多頭結構
             is_bull = (smc_id in [1, 2]) and (chan_long or chan_cls == 0) and (rsi_now >= 45.0 or wt_now >= -10.0)
             if is_bull:
                 tech_bull_cnt += 1
@@ -1796,7 +1792,6 @@ if auto_intel:
                     )
                     st.markdown(mk_html, unsafe_allow_html=True)
 
-        # 同頁精選最近期前 4 張核心 FRED 數據卡片 (如 CPI / PPI / 非農 / 初領失業金)
         if auto_intel["macro_cards"]:
             top4_macro = auto_intel["macro_cards"][:4]
             m4_cols = st.columns(len(top4_macro))
@@ -1903,7 +1898,7 @@ if auto_intel:
                 wt_now = b_res["WT快線"]
                 rsi_now = b_res["平均RSI"]
 
-                # ✅ 嚴格定義結構多空：SMC 紅CHOCH/紅BOS 絕不直接視為多頭綠燈！
+                # 嚴格定義結構多空：SMC 紅CHOCH/紅BOS 絕不直接視為多頭綠燈
                 struct_is_bull = (smc_id in [1, 2]) and (chan_long or chan_cls == 0)
                 struct_is_bear = (smc_id in [3, 4]) and ((not chan_long) or (rsi_now <= 42.0 and wt_now < 0))
 
