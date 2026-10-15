@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.5",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.6",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -27,22 +27,23 @@ st.markdown(
     ".baro-bull { border-left: 5px solid #00e676; }"
     ".baro-bear { border-left: 5px solid #ff5252; }"
     ".baro-warn { border-left: 5px solid #ffca28; }"
-    ".baro-title { font-size: 1.08rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
+    ".baro-title { font-size: 1.05rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
     ".baro-price { font-size: 0.92rem; font-family: monospace; color: #00e5ff; }"
-    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.80rem; font-weight: 700; margin-bottom: 6px; }"
+    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }"
     ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
     ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
     ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
     ".baro-advice { font-size: 0.85rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }"
     ".baro-sub { font-size: 0.75rem; color: #9ba2b0; line-height: 1.48; }"
     ".metric-pill { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; }"
-    ".macro-banner { background: linear-gradient(90deg, rgba(22,27,38,0.98), rgba(32,39,54,0.98)); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }"
+    ".strategy-box { background: linear-gradient(135deg, rgba(20,26,40,0.98), rgba(30,38,56,0.98)); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 6px 22px rgba(0,0,0,0.4); }"
+    ".news-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 9px 12px; margin-bottom: 7px; }"
     "</style>",
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.5")
-st.caption("全自動總經與技術戰情版：**自動抓取 CPI / PCE / 失業率 / 美債 / VIX / 美元與即時新聞多空判讀** ｜ **全共振區強制回踩確認** ｜ **0秒即時過濾**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.6")
+st.caption("開網頁免按鈕自動診斷版：**即時宏觀經濟 × 新聞智慧摘要 × 大盤24態風向標 × 綜合戰術指令 (對沖/做空/抄底/順勢做多)**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義 (已移除 CHOCH / BOS / 纏論123買賣點)
@@ -124,341 +125,6 @@ def save_config(config_dict):
         json.dump(config_dict, f, ensure_ascii=False, indent=4)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 🌐 自動抓取總經數據 (FRED CPI/PCE/失業率/利差) + 跨市場資金 + 即時財經新聞引擎
-# ════════════════════════════════════════════════════════════════════════════
-@st.cache_data(ttl=900)
-def fetch_macro_intelligence():
-    macro_cards = []
-    market_cards = []
-    news_items = []
-    bull_score = 0
-    bear_score = 0
-    key_drivers = []
-
-    # ── 1. 抓取聯準會 FRED 官方公開 CSV 數據 (免 API Key) ──
-    def get_fred_series(series_id, tail_n=18):
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            df_f = pd.read_csv(resp)
-        df_f.columns = ['DATE', 'VAL']
-        df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
-        df_f = df_f.dropna().tail(tail_n).reset_index(drop=True)
-        return df_f
-
-    # (A) 美國 CPI 消費者物價指數 (CPIAUCSL)
-    try:
-        df_cpi = get_fred_series("CPIAUCSL", 16)
-        if len(df_cpi) >= 14:
-            yoy_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-13] - 1.0) * 100.0
-            yoy_prev = (df_cpi['VAL'].iloc[-2] / df_cpi['VAL'].iloc[-14] - 1.0) * 100.0
-            mom_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-2] - 1.0) * 100.0
-            cpi_date = str(df_cpi['DATE'].iloc[-1])[:7]
-            diff_yoy = yoy_now - yoy_prev
-
-            if yoy_now > yoy_prev + 0.05 or mom_now >= 0.4:
-                bias, cls = "🔴 通膨升溫 (鷹派壓抑估值)", "bear"
-                bear_score += 2
-                key_drivers.append(f"CPI 年增率升至 {yoy_now:.1f}% (月增 {mom_now:+.2f}%)，通膨反彈加深聯準會鷹派立場")
-            elif yoy_now < yoy_prev - 0.05 and mom_now <= 0.25:
-                bias, cls = "🟢 通膨降溫 (鴿派利多股市)", "bull"
-                bull_score += 2
-                key_drivers.append(f"CPI 年增率降至 {yoy_now:.1f}%，通膨趨緩有利科技股估值擴張")
-            else:
-                bias, cls = "🟡 通膨黏著 (符合預期震盪)", "warn"
-
-            macro_cards.append({
-                "title": f"🇺🇸 美國 CPI 通膨 ({cpi_date})",
-                "main": f"{yoy_now:.2f}%",
-                "sub": f"前值 {yoy_prev:.2f}% ({diff_yoy:+.2f}%) ｜ 月增 {mom_now:+.2f}%",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
-
-    # (B) 美國核心 PCE 物價指數 (PCEPILFE - Fed 最重視指標)
-    try:
-        df_pce = get_fred_series("PCEPILFE", 16)
-        if len(df_pce) >= 14:
-            pce_yoy = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-13] - 1.0) * 100.0
-            pce_prev = (df_pce['VAL'].iloc[-2] / df_pce['VAL'].iloc[-14] - 1.0) * 100.0
-            pce_mom = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-2] - 1.0) * 100.0
-            pce_date = str(df_pce['DATE'].iloc[-1])[:7]
-            diff_pce = pce_yoy - pce_prev
-
-            if pce_yoy > pce_prev + 0.05 or pce_yoy >= 2.8:
-                bias, cls = "🔴 核心通膨偏高 (降息受阻)", "bear"
-                bear_score += 1
-            elif pce_yoy < pce_prev:
-                bias, cls = "🟢 核心通膨受控 (軟著陸利多)", "bull"
-                bull_score += 1
-            else:
-                bias, cls = "🟡 核心通膨持平", "warn"
-
-            macro_cards.append({
-                "title": f"🎯 核心 PCE 年增 ({pce_date})",
-                "main": f"{pce_yoy:.2f}%",
-                "sub": f"前值 {pce_prev:.2f}% ({diff_pce:+.2f}%) ｜ 月增 {pce_mom:+.2f}%",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
-
-    # (C) 美國非農失業率 (UNRATE)
-    try:
-        df_un = get_fred_series("UNRATE", 6)
-        if len(df_un) >= 3:
-            un_now = float(df_un['VAL'].iloc[-1])
-            un_prev = float(df_un['VAL'].iloc[-2])
-            un_date = str(df_un['DATE'].iloc[-1])[:7]
-            diff_un = un_now - un_prev
-
-            if un_now >= 4.4 or diff_un >= 0.2:
-                bias, cls = "🔴 失業率攀升 (留意衰退風險)", "bear"
-                bear_score += 1
-                key_drivers.append(f"失業率升至 {un_now:.1f}%，勞動市場降溫需提防經濟衰退")
-            elif un_now <= 4.2 and diff_un <= 0.0:
-                bias, cls = "🟢 就業穩健 (支撐消費基本面)", "bull"
-                bull_score += 1
-            else:
-                bias, cls = "🟡 勞動市場溫和放緩", "warn"
-
-            macro_cards.append({
-                "title": f"👷 非農失業率 ({un_date})",
-                "main": f"{un_now:.1f}%",
-                "sub": f"前值 {un_prev:.1f}% (變動 {diff_un:+.1f}%)",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
-
-    # (D) 10Y-2Y 美債殖利率利差 (T10Y2Y)
-    try:
-        df_sp = get_fred_series("T10Y2Y", 10)
-        if len(df_sp) >= 2:
-            sp_now = float(df_sp['VAL'].iloc[-1])
-            sp_prev = float(df_sp['VAL'].iloc[-5]) if len(df_sp) >= 5 else float(df_sp['VAL'].iloc[-2])
-            sp_date = str(df_sp['DATE'].iloc[-1])[:10]
-
-            if sp_now < 0:
-                bias, cls = "🔴 殖利率倒掛 (信貸緊縮警戒)", "bear"
-                bear_score += 1
-            elif sp_now > 0.5:
-                bias, cls = "🟡 曲線陡峭化 (留意長債利率)", "warn"
-            else:
-                bias, cls = "🟢 殖利率曲線正常化", "bull"
-                bull_score += 1
-
-            macro_cards.append({
-                "title": f"🏦 10Y-2Y 殖利率差 ({sp_date})",
-                "main": f"{sp_now:+.2f}%",
-                "sub": f"一週前 {sp_prev:+.2f}% ｜ >0 為正常正斜率",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
-
-    # ── 2. 抓取跨市場即時資金指標 (VIX, 10Y美債, 美元指數, 原油, 黃金) ──
-    cross_tickers = ["^VIX", "^TNX", "DX-Y.NYB", "CL=F", "GC=F"]
-    try:
-        m_data = yf.download(cross_tickers, period="10d", interval="1d", group_by='ticker', progress=False, threads=True)
-
-        def parse_m_ticker(sym):
-            df_m = m_data[sym].dropna(subset=['Close'])
-            if len(df_m) >= 2:
-                c_now = float(df_m['Close'].iloc[-1])
-                c_prev = float(df_m['Close'].iloc[-2])
-                c_5d = float(df_m['Close'].iloc[-5]) if len(df_m) >= 5 else c_prev
-                chg_1d = ((c_now - c_prev) / c_prev) * 100.0
-                chg_5d = ((c_now - c_5d) / c_5d) * 100.0
-                return c_now, chg_1d, chg_5d
-            return None
-
-        # (1) VIX 恐慌指數
-        vix_info = parse_m_ticker("^VIX")
-        if vix_info:
-            v_val, v_1d, v_5d = vix_info
-            if v_val >= 22.0 or v_1d >= 7.0:
-                v_badge, v_cls = "🔴 避險情緒升溫 (美股承壓)", "bear"
-                bear_score += 2
-                key_drivers.append(f"VIX 恐慌指數位於 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
-            elif v_val < 16.5 and v_1d <= 0:
-                v_badge, v_cls = "🟢 市場情緒穩定 (有利多頭)", "bull"
-                bull_score += 2
-            elif v_1d < -4.0:
-                v_badge, v_cls = "🟢 恐慌快速降溫 (支撐反彈)", "bull"
-                bull_score += 1
-            else:
-                v_badge, v_cls = "🟡 情緒中性震盪", "warn"
-            market_cards.append({
-                "title": "⚡ VIX 恐慌指數", "price": f"{v_val:.2f}", "chg": v_1d,
-                "sub": f"5日變動 {v_5d:+.1f}% ｜ <18 安定 / >22 恐慌", "badge": v_badge, "cls": v_cls
-            })
-
-        # (2) 10年期美債殖利率 (^TNX)
-        tnx_info = parse_m_ticker("^TNX")
-        if tnx_info:
-            t_val, t_1d, t_5d = tnx_info
-            if t_val >= 4.35 or t_5d >= 2.5:
-                t_badge, t_cls = "🔴 殖利率飆升 (壓抑科技股估值)", "bear"
-                bear_score += 2
-                key_drivers.append(f"10年期美債殖利率達 {t_val:.2f}%，無風險利率走高壓抑高估值科技股")
-            elif t_1d < -1.2 or t_5d < -2.0:
-                t_badge, t_cls = "🟢 殖利率回落 (資金回流成長股)", "bull"
-                bull_score += 2
-                key_drivers.append(f"10年期美債殖利率回落至 {t_val:.2f}%，緩解科技股估值壓力")
-            else:
-                t_badge, t_cls = "🟡 殖利率區間整理", "warn"
-            market_cards.append({
-                "title": "📈 10年期美債殖利率", "price": f"{t_val:.2f}%", "chg": t_1d,
-                "sub": f"5日變動 {t_5d:+.1f}% ｜ 科技股折現率指標", "badge": t_badge, "cls": t_cls
-            })
-
-        # (3) 美元指數 (DX-Y.NYB)
-        dxy_info = parse_m_ticker("DX-Y.NYB")
-        if dxy_info:
-            d_val, d_1d, d_5d = dxy_info
-            if d_1d >= 0.35 or d_5d >= 1.0:
-                d_badge, d_cls = "🔴 美元轉強 (外資易自台股流出)", "bear"
-                bear_score += 1
-                key_drivers.append(f"美元指數走強至 {d_val:.2f}，不利新興市場與台股外資資金面")
-            elif d_1d <= -0.30 or d_5d <= -0.8:
-                d_badge, d_cls = "🟢 美元走弱 (利好台股與風險資產)", "bull"
-                bull_score += 1
-            else:
-                d_badge, d_cls = "🟡 美元匯率持穩", "warn"
-            market_cards.append({
-                "title": "💵 DXY 美元指數", "price": f"{d_val:.2f}", "chg": d_1d,
-                "sub": f"5日變動 {d_5d:+.1f}% ｜ 全球跨國資金流向指標", "badge": d_badge, "cls": d_cls
-            })
-
-        # (4) WTI 原油期貨 (CL=F)
-        oil_info = parse_m_ticker("CL=F")
-        if oil_info:
-            o_val, o_1d, o_5d = oil_info
-            if o_val >= 82.0 or o_5d >= 5.0:
-                o_badge, o_cls = "🔴 油價大漲 (推升二次通膨隱憂)", "bear"
-                bear_score += 1
-                key_drivers.append(f"WTI 原油升至 ${o_val:.2f} (5日 {o_5d:+.1f}%)，能源成本推升通膨預期")
-            elif o_val <= 72.0 or o_5d <= -4.0:
-                o_badge, o_cls = "🟢 油價回落 (緩解通膨與企業成本)", "bull"
-                bull_score += 1
-            else:
-                o_badge, o_cls = "🟡 油價溫和整理", "warn"
-            market_cards.append({
-                "title": "🛢️ WTI 原油期貨", "price": f"${o_val:.2f}", "chg": o_1d,
-                "sub": f"5日變動 {o_5d:+.1f}% ｜ 能源型通膨先行指標", "badge": o_badge, "cls": o_cls
-            })
-
-        # (5) 黃金期貨 (GC=F)
-        gold_info = parse_m_ticker("GC=F")
-        if gold_info:
-            g_val, g_1d, g_5d = gold_info
-            if g_1d >= 1.2:
-                g_badge, g_cls = "🟡 避險/抗通膨資金湧入黃金", "warn"
-            else:
-                g_badge, g_cls = "⚪ 貴金屬走勢平穩", "warn"
-            market_cards.append({
-                "title": "🥇 黃金期貨", "price": f"${g_val:.1f}", "chg": g_1d,
-                "sub": f"5日變動 {g_5d:+.1f}% ｜ 地緣避險與通膨預期", "badge": g_badge, "cls": g_cls
-            })
-    except Exception:
-        pass
-
-    # ── 3. 即時財經與總經焦點新聞抓取 + 關鍵字多空情緒分析 ──
-    bull_words = [
-        "beat", "surge", "rally", "cooling", "eases", "cut", "dovish", "optimism",
-        "gain", "bull", "jump", "upgrade", "record high", "soar", "rebound", "growth",
-        "降溫", "利多", "大漲", "降息", "優於預期", "創高"
-    ]
-    bear_words = [
-        "hotter", "accelerates", "tops forecasts", "hike", "hawkish", "inflation rises",
-        "tariff", "sanction", "drop", "fall", "plunge", "miss", "fear", "recession",
-        "selloff", "slump", "deficit", "war", "升溫", "高於預期", "升息", "利空", "大跌", "恐慌"
-    ]
-
-    seen_titles = set()
-    for sym in ["SPY", "QQQ", "^TWII"]:
-        try:
-            raw_news = yf.Ticker(sym).news
-            if raw_news:
-                for item in raw_news[:6]:
-                    content = item.get('content', item) if isinstance(item, dict) else {}
-                    title = content.get('title') or item.get('title', '')
-                    link = ""
-                    if isinstance(content.get('canonicalUrl'), dict):
-                        link = content['canonicalUrl'].get('url', '')
-                    elif isinstance(item.get('link'), str):
-                        link = item['link']
-
-                    if title and title not in seen_titles:
-                        seen_titles.add(title)
-                        t_low = title.lower()
-                        b_hits = sum(1 for w in bull_words if w in t_low)
-                        s_hits = sum(1 for w in bear_words if w in t_low)
-                        if s_hits > b_hits:
-                            sent_tag = "🔴 偏空解讀"
-                            bear_score += 0.5
-                        elif b_hits > s_hits:
-                            sent_tag = "🟢 偏多解讀"
-                            bull_score += 0.5
-                        else:
-                            sent_tag = "⚪ 中性消息"
-                        news_items.append({"title": title, "link": link, "sentiment": sent_tag})
-        except Exception:
-            pass
-
-    # 若 yfinance 新聞較少，自動補充 Google News 總經/CPI/Fed 即時 RSS
-    if len(news_items) < 4:
-        try:
-            rss_url = "https://news.google.com/rss/search?q=US+CPI+OR+Fed+interest+rate+OR+stock+market+inflation&hl=en-US&gl=US&ceid=US:en"
-            req = urllib.request.Request(rss_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                root = ET.fromstring(resp.read())
-            for item in root.findall('.//item')[:6]:
-                title = item.find('title').text if item.find('title') is not None else ""
-                link = item.find('link').text if item.find('link') is not None else ""
-                if title and title not in seen_titles:
-                    seen_titles.add(title)
-                    t_low = title.lower()
-                    b_hits = sum(1 for w in bull_words if w in t_low)
-                    s_hits = sum(1 for w in bear_words if w in t_low)
-                    sent_tag = "🔴 偏空解讀" if s_hits > b_hits else ("🟢 偏多解讀" if b_hits > s_hits else "⚪ 中性消息")
-                    news_items.append({"title": title, "link": link, "sentiment": sent_tag})
-        except Exception:
-            pass
-
-    net_score = bull_score - bear_score
-    if net_score >= 2.0:
-        verdict = "🟢 總經與資金環境偏多 (Risk-On)"
-        verdict_cls = "bull"
-        verdict_advice = "通膨可控且無風險利率/恐慌指標溫和，總經順風有利於「右側回踩支撐 (中樞共振/OB)」積極布局做多。"
-    elif net_score <= -2.0:
-        verdict = "🔴 總經與資金環境偏空 (Risk-Off 警戒)"
-        verdict_cls = "bear"
-        verdict_advice = "通膨數據反彈或殖利率/美元/VIX 走高壓抑股市估值，建議提高現金水位、嚴守停損，做多僅限極度超賣或頂級共振支撐分批低接。"
-    else:
-        verdict = "🟡 總經多空交戰 / 數據消化期 (震盪選股)"
-        verdict_cls = "warn"
-        verdict_advice = "總經數據與跨市場資金多空力道拉鋸，大盤易呈現區間洗盤，切忌追高殺低，建議嚴格等待回踩中樞/OB共振確認後再出手。"
-
-    return {
-        "macro_cards": macro_cards,
-        "market_cards": market_cards,
-        "news_items": news_items[:8],
-        "bull_score": bull_score,
-        "bear_score": bear_score,
-        "verdict": verdict,
-        "verdict_cls": verdict_cls,
-        "verdict_advice": verdict_advice,
-        "key_drivers": key_drivers
-    }
-
-# ════════════════════════════════════════════════════════════════════════════
 # 數據獲取與 TradingView 4H 時框精準重採樣
 # ════════════════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600)
@@ -490,7 +156,6 @@ def rma(series, length):
     return series.ewm(alpha=1.0 / length, adjust=False).mean()
 
 def calc_robust_avg_vol(df_raw):
-    """穩健計算日均成交量，避免時區或索引格式造成歸零"""
     if 'Volume' not in df_raw.columns or len(df_raw) == 0:
         return 0.0
     try:
@@ -557,7 +222,7 @@ def get_tv_link(ticker):
     return f"https://www.tradingview.com/chart/?symbol={t}"
 
 # ════════════════════════════════════════════════════════════════════════════
-# 纏論核心引擎 (用於中樞延伸 OB 與大盤 24 態面板，不發送 123 買賣點訊號)
+# 纏論核心引擎 (用於中樞延伸 OB 與大盤 24 態面板)
 # ════════════════════════════════════════════════════════════════════════════
 def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     n = len(close_v)
@@ -1354,17 +1019,485 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     }
 
 # ════════════════════════════════════════════════════════════════════════════
+# 🌐 免按鈕自動載入：新聞智慧中文摘要 + 總經數據 + 大盤 24 態 + 綜合戰術指令
+# ════════════════════════════════════════════════════════════════════════════
+def translate_and_summarize_news(title):
+    """根據中英文新聞標題自動萃取主題並生成中文影響摘要與多空權重"""
+    t_low = title.lower()
+    topics = []
+    if any(w in t_low for w in ["cpi", "inflation", "pce", "consumer price", "物價", "通膨"]):
+        topics.append("通膨/CPI數據")
+    if any(w in t_low for w in ["fed", "powell", "warsh", "rate hike", "rate cut", "fomc", "central bank", "聯準會", "升息", "降息", "利率"]):
+        topics.append("Fed利率政策")
+    if any(w in t_low for w in ["yield", "treasury", "bond", "10-year", "殖利率", "美債"]):
+        topics.append("美債殖利率")
+    if any(w in t_low for w in ["oil", "gasoline", "energy", "iran", "middle east", "油價", "原油", "能源", "中東"]):
+        topics.append("能源與地緣")
+    if any(w in t_low for w in ["nvda", "nvidia", "tsmc", "semiconductor", "chip", "ai", "台積電", "輝達", "半導體", "晶片"]):
+        topics.append("AI與半導體")
+    if any(w in t_low for w in ["tariff", "trade", "china", "關稅", "貿易"]):
+        topics.append("關稅與貿易")
+    if any(w in t_low for w in ["jobs", "unemployment", "payroll", "非農", "失業率", "就業"]):
+        topics.append("就業市場")
+
+    topic_str = "・".join(topics[:2]) if topics else "市場焦點動態"
+
+    bull_words = [
+        "beat", "surge", "rally", "cooling", "eases", "cut", "dovish", "optimism",
+        "gain", "bull", "jump", "upgrade", "record high", "soar", "rebound", "growth",
+        "降溫", "利多", "大漲", "降息", "優於預期", "創高", "買超", "走揚", "反彈"
+    ]
+    bear_words = [
+        "hotter", "accelerates", "tops forecasts", "hike", "hawkish", "inflation rises",
+        "tariff", "sanction", "drop", "fall", "plunge", "miss", "fear", "recession",
+        "selloff", "slump", "deficit", "war", "ugly", "jump in us inflation", "yields jump",
+        "steepest", "shed", "losses", "升溫", "高於預期", "升息", "利空", "大跌", "恐慌", "賣超", "重挫", "破底", "飆升", "暴跌"
+    ]
+
+    b_hits = sum(1 for w in bull_words if w in t_low)
+    s_hits = sum(1 for w in bear_words if w in t_low)
+
+    if s_hits > b_hits:
+        sentiment = "🔴 利空衝擊"
+        score = -0.6
+        if "通膨/CPI數據" in topic_str or "Fed利率政策" in topic_str:
+            impact = "通膨數據超預期升溫或升息擔憂加劇，推升美債殖利率並壓抑科技股估值"
+        elif "能源與地緣" in topic_str:
+            impact = "汽油與能源價格大漲增添通膨黏著度，壓抑市場風險偏好"
+        elif "AI與半導體" in topic_str:
+            impact = "科技與半導體權值股面臨折現率上升與獲利了結賣壓"
+        else:
+            impact = "市場避險情緒升溫，短線資金偏向保守防禦與減碼"
+    elif b_hits > s_hits:
+        sentiment = "🟢 利多支撐"
+        score = 0.6
+        if "通膨/CPI數據" in topic_str or "Fed利率政策" in topic_str:
+            impact = "通膨趨緩或政策轉鴿預期，有利資金回流風險資產"
+        elif "AI與半導體" in topic_str:
+            impact = "AI 與半導體需求強勁，支撐權值股與大盤多頭人氣"
+        else:
+            impact = "市場買盤信心回溫，支撐指數偏多表現"
+    else:
+        sentiment = "⚪ 中性觀察"
+        score = 0.0
+        impact = "市場正在消化最新總經數據與政策訊號，多空觀望氣氛濃厚"
+
+    return topic_str, sentiment, impact, score
+
+
+@st.cache_data(ttl=900)
+def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob):
+    macro_cards = []
+    market_cards = []
+    news_items = []
+    bull_score = 0.0
+    bear_score = 0.0
+    key_drivers = []
+
+    # ── 1. 抓取聯準會 FRED 官方公開 CSV 數據 ──
+    def get_fred_series(series_id, tail_n=18):
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            df_f = pd.read_csv(resp)
+        df_f.columns = ['DATE', 'VAL']
+        df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
+        return df_f.dropna().tail(tail_n).reset_index(drop=True)
+
+    # (A) 美國 CPI 消費者物價指數 (CPIAUCSL) 與核心 CPI (CPILFESL)
+    try:
+        df_cpi = get_fred_series("CPIAUCSL", 16)
+        df_core = get_fred_series("CPILFESL", 16)
+        if len(df_cpi) >= 14:
+            yoy_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-13] - 1.0) * 100.0
+            yoy_prev = (df_cpi['VAL'].iloc[-2] / df_cpi['VAL'].iloc[-14] - 1.0) * 100.0
+            mom_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-2] - 1.0) * 100.0
+            cpi_date = str(df_cpi['DATE'].iloc[-1])[:7]
+            diff_yoy = yoy_now - yoy_prev
+
+            core_str = ""
+            if len(df_core) >= 14:
+                c_yoy = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-13] - 1.0) * 100.0
+                c_mom = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-2] - 1.0) * 100.0
+                core_str = f" ｜ 核心年增 {c_yoy:.1f}%(月+{c_mom:.1f}%)"
+
+            if yoy_now > yoy_prev + 0.05 or mom_now >= 0.4:
+                bias, cls = "🔴 通膨升溫 (鷹派升息警戒)", "bear"
+                bear_score += 2.5
+                key_drivers.append(f"最新美國 CPI 年增加速至 {yoy_now:.1f}% (前值 {yoy_prev:.1f}%、月增 {mom_now:+.1f}%){core_str}，汽油與能源飆升推升 Fed 升息擔憂")
+            elif yoy_now < yoy_prev - 0.05 and mom_now <= 0.25:
+                bias, cls = "🟢 通膨降溫 (鴿派利多股市)", "bull"
+                bull_score += 2.5
+                key_drivers.append(f"最新美國 CPI 年增降至 {yoy_now:.1f}%，通膨降溫有利科技股估值擴張")
+            else:
+                bias, cls = "🟡 通膨黏著 (高檔震盪)", "warn"
+
+            macro_cards.append({
+                "title": f"🇺🇸 美國 CPI 通膨 ({cpi_date})",
+                "main": f"{yoy_now:.1f}%",
+                "sub": f"前值 {yoy_prev:.1f}% ({diff_yoy:+.1f}%) ｜ 月增 {mom_now:+.1f}%{core_str}",
+                "badge": bias,
+                "cls": cls
+            })
+    except Exception:
+        pass
+
+    # (B) 美國核心 PCE 物價指數 (PCEPILFE)
+    try:
+        df_pce = get_fred_series("PCEPILFE", 16)
+        if len(df_pce) >= 14:
+            pce_yoy = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-13] - 1.0) * 100.0
+            pce_prev = (df_pce['VAL'].iloc[-2] / df_pce['VAL'].iloc[-14] - 1.0) * 100.0
+            pce_mom = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-2] - 1.0) * 100.0
+            pce_date = str(df_pce['DATE'].iloc[-1])[:7]
+            diff_pce = pce_yoy - pce_prev
+
+            if pce_yoy > pce_prev + 0.05 or pce_yoy >= 2.6:
+                bias, cls = "🔴 核心通膨偏高 (高利率維持)", "bear"
+                bear_score += 1.0
+            elif pce_yoy < pce_prev:
+                bias, cls = "🟢 核心通膨受控 (軟著陸利多)", "bull"
+                bull_score += 1.0
+            else:
+                bias, cls = "🟡 核心通膨持平", "warn"
+
+            macro_cards.append({
+                "title": f"🎯 核心 PCE 年增 ({pce_date})",
+                "main": f"{pce_yoy:.2f}%",
+                "sub": f"前值 {pce_prev:.2f}% ({diff_pce:+.2f}%) ｜ 月增 {pce_mom:+.2f}%",
+                "badge": bias,
+                "cls": cls
+            })
+    except Exception:
+        pass
+
+    # (C) 美國非農失業率 (UNRATE)
+    try:
+        df_un = get_fred_series("UNRATE", 6)
+        if len(df_un) >= 3:
+            un_now = float(df_un['VAL'].iloc[-1])
+            un_prev = float(df_un['VAL'].iloc[-2])
+            un_date = str(df_un['DATE'].iloc[-1])[:7]
+            diff_un = un_now - un_prev
+
+            if un_now >= 4.4 or diff_un >= 0.2:
+                bias, cls = "🔴 失業率攀升 (留意硬著陸風險)", "bear"
+                bear_score += 1.0
+                key_drivers.append(f"失業率升至 {un_now:.1f}%，勞動市場降溫")
+            elif un_now <= 4.2 and diff_un <= 0.0:
+                bias, cls = "🟢 就業穩健 (支撐經濟基本面)", "bull"
+                bull_score += 1.0
+            else:
+                bias, cls = "🟡 勞動市場溫和放緩", "warn"
+
+            macro_cards.append({
+                "title": f"👷 非農失業率 ({un_date})",
+                "main": f"{un_now:.1f}%",
+                "sub": f"前值 {un_prev:.1f}% (變動 {diff_un:+.1f}%)",
+                "badge": bias,
+                "cls": cls
+            })
+    except Exception:
+        pass
+
+    # (D) 10Y-2Y 美債殖利率利差 (T10Y2Y)
+    try:
+        df_sp = get_fred_series("T10Y2Y", 10)
+        if len(df_sp) >= 2:
+            sp_now = float(df_sp['VAL'].iloc[-1])
+            sp_prev = float(df_sp['VAL'].iloc[-5]) if len(df_sp) >= 5 else float(df_sp['VAL'].iloc[-2])
+            sp_date = str(df_sp['DATE'].iloc[-1])[:10]
+
+            if sp_now < 0:
+                bias, cls = "🔴 殖利率倒掛 (信貸緊縮警戒)", "bear"
+                bear_score += 1.0
+            elif sp_now > 0.45:
+                bias, cls = "🟡 長債殖利率陡峭化", "warn"
+            else:
+                bias, cls = "🟢 殖利率曲線正常化", "bull"
+                bull_score += 0.5
+
+            macro_cards.append({
+                "title": f"🏦 10Y-2Y 殖利率差 ({sp_date})",
+                "main": f"{sp_now:+.2f}%",
+                "sub": f"一週前 {sp_prev:+.2f}% ｜ 長短天期利差結構",
+                "badge": bias,
+                "cls": cls
+            })
+    except Exception:
+        pass
+
+    # ── 2. 抓取跨市場即時資金指標 (VIX, 10Y美債, 美元指數, 原油, 黃金) ──
+    cross_tickers = ["^VIX", "^TNX", "DX-Y.NYB", "CL=F", "GC=F"]
+    try:
+        m_data = yf.download(cross_tickers, period="10d", interval="1d", group_by='ticker', progress=False, threads=True)
+
+        def parse_m_ticker(sym):
+            df_m = m_data[sym].dropna(subset=['Close'])
+            if len(df_m) >= 2:
+                c_now = float(df_m['Close'].iloc[-1])
+                c_prev = float(df_m['Close'].iloc[-2])
+                c_5d = float(df_m['Close'].iloc[-5]) if len(df_m) >= 5 else c_prev
+                chg_1d = ((c_now - c_prev) / c_prev) * 100.0
+                chg_5d = ((c_now - c_5d) / c_5d) * 100.0
+                return c_now, chg_1d, chg_5d
+            return None
+
+        vix_info = parse_m_ticker("^VIX")
+        if vix_info:
+            v_val, v_1d, v_5d = vix_info
+            if v_val >= 21.5 or v_1d >= 6.5:
+                v_badge, v_cls = "🔴 避險情緒升溫 (美股承壓)", "bear"
+                bear_score += 2.0
+                key_drivers.append(f"VIX 恐慌指數跳升至 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
+            elif v_val < 16.5 and v_1d <= 0:
+                v_badge, v_cls = "🟢 市場情緒穩定 (有利多頭)", "bull"
+                bull_score += 2.0
+            elif v_1d < -4.0:
+                v_badge, v_cls = "🟢 恐慌快速降溫 (支撐反彈)", "bull"
+                bull_score += 1.0
+            else:
+                v_badge, v_cls = "🟡 情緒中性震盪", "warn"
+            market_cards.append({
+                "title": "⚡ VIX 恐慌指數", "price": f"{v_val:.2f}", "chg": v_1d,
+                "sub": f"5日變動 {v_5d:+.1f}% ｜ <18 安定 / >21.5 警戒", "badge": v_badge, "cls": v_cls
+            })
+
+        tnx_info = parse_m_ticker("^TNX")
+        if tnx_info:
+            t_val, t_1d, t_5d = tnx_info
+            if t_val >= 4.40 or t_1d >= 1.5 or t_5d >= 2.5:
+                t_badge, t_cls = "🔴 殖利率走高 (壓抑科技股估值)", "bear"
+                bear_score += 2.0
+                key_drivers.append(f"10年期美債殖利率攀升至 {t_val:.2f}% ({t_1d:+.1f}%)，無風險利率上升壓抑高估值科技股")
+            elif t_1d < -1.2 or t_5d < -2.0:
+                t_badge, t_cls = "🟢 殖利率回落 (資金回流成長股)", "bull"
+                bull_score += 2.0
+                key_drivers.append(f"10年期美債殖利率回落至 {t_val:.2f}%，緩解科技股折現率壓力")
+            else:
+                t_badge, t_cls = "🟡 殖利率高檔整理", "warn"
+            market_cards.append({
+                "title": "📈 10年期美債殖利率", "price": f"{t_val:.2f}%", "chg": t_1d,
+                "sub": f"5日變動 {t_5d:+.1f}% ｜ 科技股估值折現核心指標", "badge": t_badge, "cls": t_cls
+            })
+
+        dxy_info = parse_m_ticker("DX-Y.NYB")
+        if dxy_info:
+            d_val, d_1d, d_5d = dxy_info
+            if d_1d >= 0.30 or d_5d >= 0.9:
+                d_badge, d_cls = "🔴 美元轉強 (外資易自台股流出)", "bear"
+                bear_score += 1.5
+                key_drivers.append(f"美元指數轉強至 {d_val:.2f} ({d_1d:+.2f}%)，不利台股外資資金面與非美資產")
+            elif d_1d <= -0.30 or d_5d <= -0.8:
+                d_badge, d_cls = "🟢 美元走弱 (利好台股與風險資產)", "bull"
+                bull_score += 1.5
+            else:
+                d_badge, d_cls = "🟡 美元匯率持穩", "warn"
+            market_cards.append({
+                "title": "💵 DXY 美元指數", "price": f"{d_val:.2f}", "chg": d_1d,
+                "sub": f"5日變動 {d_5d:+.1f}% ｜ 全球跨國資金流向指標", "badge": d_badge, "cls": d_cls
+            })
+
+        oil_info = parse_m_ticker("CL=F")
+        if oil_info:
+            o_val, o_1d, o_5d = oil_info
+            if o_val >= 80.0 or o_1d >= 2.0 or o_5d >= 4.5:
+                o_badge, o_cls = "🔴 油價走高 (推升汽油與CPI通膨)", "bear"
+                bear_score += 1.5
+                key_drivers.append(f"WTI 原油報 ${o_val:.2f} (5日 {o_5d:+.1f}%)，油價與能源成本上揚成為推升 CPI 通膨主因")
+            elif o_val <= 70.0 or o_5d <= -4.0:
+                o_badge, o_cls = "🟢 油價回落 (緩解通膨與企業成本)", "bull"
+                bull_score += 1.5
+            else:
+                o_badge, o_cls = "🟡 油價區間整理", "warn"
+            market_cards.append({
+                "title": "🛢️ WTI 原油期貨", "price": f"${o_val:.2f}", "chg": o_1d,
+                "sub": f"5日變動 {o_5d:+.1f}% ｜ 能源型通膨先行指標", "badge": o_badge, "cls": o_cls
+            })
+
+        gold_info = parse_m_ticker("GC=F")
+        if gold_info:
+            g_val, g_1d, g_5d = gold_info
+            g_badge = "🟡 避險/抗通膨資金湧入" if g_1d >= 1.0 else ("🔵 美元走強壓抑金價" if g_1d <= -1.0 else "⚪ 貴金屬高檔震盪")
+            market_cards.append({
+                "title": "🥇 黃金期貨", "price": f"${g_val:.1f}", "chg": g_1d,
+                "sub": f"5日變動 {g_5d:+.1f}% ｜ 實質利率與避險指標", "badge": g_badge, "cls": "warn"
+            })
+    except Exception:
+        pass
+
+    # ── 3. 自動抓取中英文重大財經/CPI/台美股新聞並生成智慧摘要 ──
+    seen_titles = set()
+    rss_sources = [
+        ("🇺🇸 國際總經/CPI", "https://news.google.com/rss/search?q=US+CPI+inflation+OR+Federal+Reserve+rate+OR+Treasury+yields+when:2d&hl=en-US&gl=US&ceid=US:en"),
+        ("🇹🇼 台美股/財經", "https://news.google.com/rss/search?q=%E7%BE%8E%E5%9C%8BCPI+OR+%E8%81%AF%E6%BA%96%E6%9C%83+OR+%E5%8F%B0%E8%82%A1+OR+%E5%8F%B0%E7%A9%8D%E9%9B%BB+when:2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
+    ]
+
+    for src_tag, rss_url in rss_sources:
+        try:
+            req = urllib.request.Request(rss_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                root = ET.fromstring(resp.read())
+            for item in root.findall('.//item')[:4]:
+                title = item.find('title').text if item.find('title') is not None else ""
+                link = item.find('link').text if item.find('link') is not None else ""
+                if title and title not in seen_titles:
+                    seen_titles.add(title)
+                    topic_str, sent_tag, impact_str, sc = translate_and_summarize_news(title)
+                    if sc > 0:
+                        bull_score += sc
+                    elif sc < 0:
+                        bear_score += abs(sc)
+                    news_items.append({
+                        "src": src_tag, "topic": topic_str, "title": title,
+                        "link": link, "sentiment": sent_tag, "impact": impact_str
+                    })
+        except Exception:
+            pass
+
+    if len(news_items) < 6:
+        for sym in ["SPY", "QQQ"]:
+            try:
+                raw_news = yf.Ticker(sym).news
+                if raw_news:
+                    for item in raw_news[:3]:
+                        content = item.get('content', item) if isinstance(item, dict) else {}
+                        title = content.get('title') or item.get('title', '')
+                        link = ""
+                        if isinstance(content.get('canonicalUrl'), dict):
+                            link = content['canonicalUrl'].get('url', '')
+                        elif isinstance(item.get('link'), str):
+                            link = item['link']
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
+                            topic_str, sent_tag, impact_str, sc = translate_and_summarize_news(title)
+                            news_items.append({
+                                "src": "🌎 華爾街快訊", "topic": topic_str, "title": title,
+                                "link": link, "sentiment": sent_tag, "impact": impact_str
+                            })
+            except Exception:
+                pass
+
+    # ── 4. 自動掃描 5 大盤指數 24 態結構風向標 ──
+    barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
+    baro_results = {}
+    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+    try:
+        b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+        for b_tick in barometer_tickers:
+            try:
+                df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
+                df_b = df_b.dropna(subset=['Close'])
+                if len(df_b) > 40:
+                    df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
+                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
+            except Exception:
+                baro_results[b_tick] = None
+    except Exception:
+        pass
+
+    # ── 5. 計算大盤技術結構得分，並與宏觀經濟交叉生成「終極戰術指令」 ──
+    tech_bull_cnt, tech_bear_cnt = 0, 0
+    k2_dip_indices, k2_top_indices = [], []
+    bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認"]
+    top_escape_kws = ["頂部預警", "WT 死叉", "多頭陷阱", "中樞共振 Sell", "OB共振壓力", "中樞 Sell", "OB壓力確認"]
+
+    for b_tick in ["QQQ", "SOXX", "SPY", "^TWII"]:
+        res = baro_results.get(b_tick)
+        if res:
+            smc_id = res["SMC_State_ID"]
+            chan_long = res["Chan_Is_Long"]
+            chan_cls = res["Chan_Cls"]
+            is_bull = (smc_id in [1, 2] and (chan_long or chan_cls == 0)) or (smc_id in [3, 4] and chan_long and chan_cls in [1, 2])
+            if is_bull:
+                tech_bull_cnt += 1
+            else:
+                tech_bear_cnt += 1
+
+            k2_s = res.get("K2_Signals", [])
+            if any(any(k in s for k in bottom_dip_kws) for s in k2_s):
+                k2_dip_indices.append(b_tick)
+            if any(any(k in s for k in top_escape_kws) for s in k2_s):
+                k2_top_indices.append(b_tick)
+
+    macro_net = bull_score - bear_score
+
+    # 6 大綜合戰術場景判讀 (對沖 / 做空 / 抄底 / 順勢做多 / 右側回踩 / 區間)
+    if macro_net <= -1.5 and tech_bull_cnt >= 2:
+        tactical_mode = "🛡️ 【買入對沖 (Hedge) ／ 逢高減碼防守】"
+        tactical_cls = "warn"
+        tactical_detail = (
+            "目前**宏觀經濟與資金面偏空**（如 CPI 通膨反彈、美債殖利率與美元跳升壓抑估值），但**大盤指數仍處於多頭結構或高檔震盪**。"
+            "這種「基本面逆風 vs 技術面高檔」最容易引發突發性補跌或誘多殺盤！\n"
+            "👉 **實戰建議**：切勿在突破時追高！現有多單建議逢反彈至壓力區減碼，或配置 **SQQQ / SPXS / 台指空單 / VIX 避險部位進行對沖 (Hedge)**；若要做多僅能等待回踩「🌟中樞共振 / 🟪OB共振支撐」收腳確認。"
+        )
+    elif macro_net <= -1.5 and tech_bear_cnt >= 3 and len(k2_dip_indices) == 0:
+        tactical_mode = "📉 【順勢做空 (Short) ／ 反彈測試壓力做空】"
+        tactical_cls = "bear"
+        tactical_detail = (
+            "目前**宏觀數據偏空（通膨/利率逆風）且四大指數多數已跌破 SMC/纏論結構轉空**，形成「總經 ＋ 技術雙重空頭共振」。\n"
+            "👉 **實戰建議**：保留高現金水位，操作以 **順勢做空、反彈遇『🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警』放空或買入反向 ETF** 為主，未出現極度超賣訊號前切勿盲目摸底。"
+        )
+    elif len(k2_dip_indices) > 0 and (tech_bear_cnt >= 2 or macro_net < 0):
+        tactical_mode = f"⚡ 【左側分批抄底 (Buy the Dip) ／ 搶反彈快進快出】({', '.join(k2_dip_indices)} 觸發支撐/抄底)"
+        tactical_cls = "bull"
+        tactical_detail = (
+            f"雖然宏觀或趨勢仍有壓力，但大盤核心指數（**{', '.join(k2_dip_indices)}**）近 2 根 K 棒已觸發 **抄底或關鍵 OB/中樞支撐守穩訊號**，短線急跌宣洩後具備強勁技術面反抽動能。\n"
+            "👉 **實戰建議**：可針對左側篩選出「🟢恐慌抄底 / 🟣極度超賣 / 🌟中樞共振Buy」的強勢權值股或槓桿 ETF (如 00631L / QLD / SOXL) **分批試單抄底**，並嚴格以該支撐下緣作為停損防守點。"
+        )
+    elif macro_net >= 1.5 and tech_bull_cnt >= 3:
+        tactical_mode = "🚀 【順勢積極做多 (Trend Long) ／ 抱牢主升段】"
+        tactical_cls = "bull"
+        tactical_detail = (
+            "目前**總經數據與跨市場資金順風（Risk-On）且大盤處於多頭結構**，屬於勝率最高的順風做多環境！\n"
+            "👉 **實戰建議**：多單抱牢，積極鎖定下方篩選器中觸發 **「🌟中樞共振Buy / 🟪OB共振支撐 / 🟩OB支撐確認」** 的高成交量領頭羊順勢加碼做多。"
+        )
+    elif macro_net >= 0 and tech_bear_cnt >= 2:
+        tactical_mode = "💎 【右側回踩做多 ／ 等待底部結構確認】"
+        tactical_cls = "warn"
+        tactical_detail = (
+            "目前**總經與資金環境尚稱溫和，但大盤技術面正處於回檔修正洗盤階段**。\n"
+            "👉 **實戰建議**：屬於「多頭市場的技術性回調」，採取 **買黑不買紅** 策略，耐心等待個股回踩中樞或 OB 共振支撐確認守穩後，進行右側低接布局。"
+        )
+    else:
+        tactical_mode = "⚖️ 【多空雙向區間操作 ／ 重個股輕指數 (選股不選市)】"
+        tactical_cls = "warn"
+        tactical_detail = (
+            "目前**宏觀數據（通膨/利率預期）與大盤技術結構處於多空拉鋸消化期**，指數空間有限、個股強弱分化劇烈。\n"
+            "👉 **實戰建議**：避免追高殺低！逢低在 **OB/中樞共振支撐做多**，逢高遇 **OB/中樞壓力或頂部預警獲利了結/短空對沖**，嚴控部位在 5～6 成水位。"
+        )
+
+    return {
+        "macro_cards": macro_cards,
+        "market_cards": market_cards,
+        "news_items": news_items[:8],
+        "bull_score": bull_score,
+        "bear_score": bear_score,
+        "key_drivers": key_drivers,
+        "baro_results": baro_results,
+        "tactical_mode": tactical_mode,
+        "tactical_cls": tactical_cls,
+        "tactical_detail": tactical_detail,
+        "tech_bull_cnt": tech_bull_cnt,
+        "tech_bear_cnt": tech_bear_cnt
+    }
+
+# ════════════════════════════════════════════════════════════════════════════
 # 網頁側邊欄設定
 # ════════════════════════════════════════════════════════════════════════════
 user_config = load_config()
 
 st.sidebar.header("⚙️ 雷達掃描設定")
 
+if st.sidebar.button("🔄 強制刷新大盤與總經數據", use_container_width=True):
+    st.cache_data.clear()
+    st.rerun()
+
 st.sidebar.subheader("📌 收藏標的清單")
 fav_input = st.sidebar.text_area(
     "請輸入股票代號 (用半形逗號分隔)：",
     value=user_config["favorites"],
-    height=120,
+    height=115,
     help="台股請加 .TW (如 2330.TW)。大盤 ^TWII，美股期貨 NQ=F，加密貨幣 BTC-USD。"
 )
 
@@ -1372,7 +1505,7 @@ st.sidebar.subheader("🎯 訊號與排序參數")
 tf_options = {"15分K": "15m", "1小時K": "1h", "4小時K (TV標準)": "4h", "日K": "1d"}
 tf_opts_keys = list(tf_options.keys())
 tf_idx = tf_opts_keys.index(user_config["selected_tf_label"]) if user_config["selected_tf_label"] in tf_opts_keys else 2
-selected_tf_label = st.sidebar.selectbox("⏳ 選擇時間框架", tf_opts_keys, index=tf_idx)
+selected_tf_label = st.sidebar.selectbox("⏳ 選擇時間框架 (切換即自動重算大盤)", tf_opts_keys, index=tf_idx)
 selected_tf = tf_options[selected_tf_label]
 
 col_s1, col_s2 = st.sidebar.columns(2)
@@ -1467,210 +1600,101 @@ with col_b1:
         st.rerun()
 
 with col_b2:
-    scan_btn = st.button("🚀 立即啟動掃描", type="primary", use_container_width=True)
+    scan_btn = st.button("🚀 掃描個股清單", type="primary", use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 執行掃描並寫入快取 (讓後續打叉過濾與排序切換 0 秒即時完成)
+# 第一部分：免按鈕自動執行！打開網頁直接呈現「宏觀經濟 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
 # ════════════════════════════════════════════════════════════════════════════
-if scan_btn:
-    favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
-    all_tickers = favorites.copy()
+with st.spinner("🌐 正在自動同步全球最新 CPI/總經數據、財經新聞摘要與 5 大盤 24 態結構..."):
+    auto_intel = fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob)
 
-    if scan_us_indices:
-        with st.spinner("🔄 正在取得美股三大指數成分股清單..."):
-            us_stocks, _, _, success = get_us_indices()
-            if not success:
-                st.warning("⚠️ 維基百科連線受限，已切換至核心權值股備用清單。")
-            all_tickers.extend(us_stocks)
+if auto_intel:
+    # ── 頂部核心：宏觀經濟 × 大盤結構 綜合戰術指揮中心 ──
+    st.subheader("🧭 宏觀經濟 × 大盤結構：全局戰術決策中心 (免掃描自動更新)")
 
-    all_tickers = list(dict.fromkeys(all_tickers))
-    if not all_tickers:
-        st.error("❌ 收藏清單是空的！")
-        st.stop()
+    t_cls = auto_intel["tactical_cls"]
+    b_sc = auto_intel["bull_score"]
+    s_sc = auto_intel["bear_score"]
+    tb_cnt = auto_intel["tech_bull_cnt"]
+    ts_cnt = auto_intel["tech_bear_cnt"]
 
-    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+    drivers_html = ""
+    if auto_intel["key_drivers"]:
+        drivers_list = "".join([f"<li style='margin-bottom:3px;'>{d}</li>" for d in auto_intel["key_drivers"]])
+        drivers_html = f"<div style='margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:0.83rem;color:#ffd600;'><b>📌 當前核心總經與市場驅動因子：</b><ul style='margin:4px 0 0 18px;padding:0;color:#e0e3eb;'>{drivers_list}</ul></div>"
 
-    # 0. 自動抓取最新總經數據 (FRED CPI/PCE/失業率) 與跨市場資金 + 新聞情緒
-    with st.spinner("🌐 正在自動抓取最新 CPI / 核心PCE / 失業率 / 美債殖利率 / VIX 與即時財經新聞..."):
-        macro_intel = fetch_macro_intelligence()
+    strat_html = (
+        f'<div class="strategy-box baro-{t_cls}">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+        f'<span style="font-size:1.22rem;font-weight:900;color:#ffffff;">🎯 綜合戰術指令：{auto_intel["tactical_mode"]}</span>'
+        f'<div>'
+        f'<span class="baro-badge badge-{t_cls}" style="margin-right:6px;">宏觀資金評分：多 {b_sc:.1f} vs 空 {s_sc:.1f}</span>'
+        f'<span class="baro-badge badge-{"bull" if tb_cnt >= ts_cnt else "bear"}">大盤結構 ({selected_tf_label})：{tb_cnt} 多 vs {ts_cnt} 空</span>'
+        f'</div></div>'
+        f'<div style="font-size:0.90rem;color:#ffffff;line-height:1.6;">{auto_intel["tactical_detail"].replace(chr(10), "<br>")}</div>'
+        f'{drivers_html}'
+        f'</div>'
+    )
+    st.markdown(strat_html, unsafe_allow_html=True)
 
-    # 1. 掃描大盤 24 態風向標
-    barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
-    baro_results = {}
-    with st.spinner("🔄 正在運算大盤 24 態纏論×SMC 矩陣與近 2K 閃電抄底訊號..."):
-        b_data = yf.download(barometer_tickers, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
-        for b_tick in barometer_tickers:
-            try:
-                df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
-                df_b = df_b.dropna(subset=['Close'])
-                if len(df_b) > 40:
-                    df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
-                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
-            except Exception:
-                baro_results[b_tick] = None
+    # ── 總經數據卡片 (CPI / 核心PCE / 失業率 / 殖利率差) ──
+    if auto_intel["macro_cards"]:
+        m_cols = st.columns(len(auto_intel["macro_cards"]))
+        for idx, mc in enumerate(auto_intel["macro_cards"]):
+            with m_cols[idx]:
+                c_html = (
+                    f'<div class="baro-card baro-{mc["cls"]}">'
+                    f'<div class="baro-title"><span>{mc["title"]}</span>'
+                    f'<span class="baro-price">{mc["main"]}</span></div>'
+                    f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span>'
+                    f'<div class="baro-sub">{mc["sub"]}</div>'
+                    f'</div>'
+                )
+                st.markdown(c_html, unsafe_allow_html=True)
 
-    # 2. 批量掃描個股
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    chunk_size = 80
-    all_scanned_rows = []
-    successful_tickers = set()
-    start_time = time.time()
-    use_fund = not scan_mode.startswith("1")
+    # ── 跨市場即時資金風向標 (VIX / 10Y美債 / 美元 / 原油 / 黃金) ──
+    if auto_intel["market_cards"]:
+        mk_cols = st.columns(len(auto_intel["market_cards"]))
+        for idx, mk in enumerate(auto_intel["market_cards"]):
+            with mk_cols[idx]:
+                chg_col = "#00e676" if mk["chg"] >= 0 else "#ff5252"
+                mk_html = (
+                    f'<div class="baro-card baro-{mk["cls"]}">'
+                    f'<div class="baro-title"><span>{mk["title"]}</span>'
+                    f'<span class="baro-price">{mk["price"]} <span style="color:{chg_col};font-size:0.80rem;">({mk["chg"]:+.2f}%)</span></span></div>'
+                    f'<span class="baro-badge badge-{mk["cls"]}">{mk["badge"]}</span>'
+                    f'<div class="baro-sub">{mk["sub"]}</div>'
+                    f'</div>'
+                )
+                st.markdown(mk_html, unsafe_allow_html=True)
 
-    for i in range(0, len(all_tickers), chunk_size):
-        batch = all_tickers[i : i + chunk_size]
-        status_text.text(f"⏳ 正在下載與分析 K 線: {i} / {len(all_tickers)} ...")
-        try:
-            data = yf.download(batch, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
-            for t in batch:
-                try:
-                    df_t = data[t] if len(batch) > 1 else data
-                    df_t = df_t.dropna(subset=['Close'])
-                    if len(df_t) > 40:
-                        successful_tickers.add(t)
-                        avg_vol = calc_robust_avg_vol(df_t)
-
-                        df_proc = resample_to_tv_4h(df_t, t) if selected_tf == "4h" else df_t.copy()
-                        res_tech = scan_signals(df_proc, recent_k=recent_k, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
-                        if res_tech is None:
-                            continue
-
-                        pass_tech = res_tech["觸發指標通知"] != ""
-                        pass_fund = False
-                        pe_val, peg_val, pb_val = 0.0, 0.0, 0.0
-
-                        if use_fund:
-                            try:
-                                info = yf.Ticker(t).info
-                                pe_val = float(info.get('trailingPE') or 0)
-                                peg_val = float(info.get('pegRatio') or 0)
-                                pb_val = float(info.get('priceToBook') or 0)
-                                cond_pe = (0 < pe_val <= max_pe) if max_pe > 0 else True
-                                cond_peg = (0 < peg_val <= max_peg) if max_peg > 0 else True
-                                cond_pb = (0 < pb_val <= max_pb) if max_pb > 0 else True
-                                pass_fund = True if (max_pe == 0 and max_peg == 0 and max_pb == 0) else (cond_pe and cond_peg and cond_pb)
-                            except Exception:
-                                pass_fund = False
-
-                        smc_str = f"🟢 多頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == 1 else (
-                            f"🔴 空頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == -1 else "⚪ 震盪整理"
-                        )
-
-                        cur_vol = float(res_tech["當前成交量"])
-                        all_scanned_rows.append({
-                            "Raw_Ticker": t,
-                            "Is_Fav": t in favorites,
-                            "標的代號": f"⭐ {t}" if (t in favorites) else t,
-                            "TV圖表": get_tv_link(t),
-                            "SMC 結構": smc_str,
-                            "最新收盤價": f"{res_tech['最新收盤價']:.2f} ({res_tech['漲跌幅']:+.2f}%)",
-                            "當前成交量": cur_vol,
-                            "日均交易量": avg_vol,
-                            "All_Signals": res_tech["觸發指標通知"],
-                            "最近支撐區": res_tech["最近支撐區"],
-                            "最近壓力區": res_tech["最近壓力區"],
-                            "PEG (市賺率)": f"{peg_val:.2f}" if peg_val > 0 else "N/A",
-                            "P/E": f"{pe_val:.2f}" if pe_val > 0 else "N/A",
-                            "P/B": f"{pb_val:.2f}" if pb_val > 0 else "N/A",
-                            "Pass_Tech": pass_tech,
-                            "Pass_Fund": pass_fund
-                        })
-                except Exception:
-                    continue
-        except Exception:
-            continue
-        progress_bar.progress(min((i + chunk_size) / len(all_tickers), 1.0))
-
-    progress_bar.empty()
-    status_text.empty()
-
-    st.session_state.scan_cache = {
-        "macro_intel": macro_intel,
-        "baro_results": baro_results,
-        "all_scanned_rows": all_scanned_rows,
-        "failed_tickers": [t for t in all_tickers if t not in successful_tickers],
-        "elapsed": int(time.time() - start_time),
-        "tf_label": selected_tf_label,
-        "tf_code": selected_tf
-    }
-
-# ════════════════════════════════════════════════════════════════════════════
-# 畫面渲染區 (只要有掃描快取，修改左側任何過濾器/排序皆可 0 秒即時更新！)
-# ════════════════════════════════════════════════════════════════════════════
-if "scan_cache" in st.session_state:
-    cache = st.session_state.scan_cache
-    macro_intel = cache.get("macro_intel")
-    baro_results = cache["baro_results"]
-    all_scanned_rows = cache["all_scanned_rows"]
-
-    # ── 第零區：全球總經數據 (CPI / PCE / 失業率) × 跨市場資金多空指揮中心 ──
-    if macro_intel:
-        st.subheader("🌐 全球總經數據 (CPI / PCE / 非農) × 跨市場資金多空指揮中心")
-
-        v_cls = macro_intel["verdict_cls"]
-        b_sc = macro_intel["bull_score"]
-        s_sc = macro_intel["bear_score"]
-        drivers_html = ""
-        if macro_intel["key_drivers"]:
-            drivers_html = "<div style='margin-top:6px;font-size:0.82rem;color:#ffd600;'>📌 <b>近期關鍵驅動因子：</b>" + " ｜ ".join(macro_intel["key_drivers"]) + "</div>"
-
-        banner_html = (
-            f'<div class="macro-banner baro-{v_cls}">'
-            f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">'
-            f'<span style="font-size:1.12rem;font-weight:800;color:#ffffff;">{macro_intel["verdict"]}</span>'
-            f'<span class="baro-badge badge-{v_cls}">總經與資金計分：多方 {b_sc:.1f} vs 空方 {s_sc:.1f}</span>'
-            f'</div>'
-            f'<div style="font-size:0.86rem;color:#d0d5e0;margin-top:4px;">💡 <b>操作策略建議：</b>{macro_intel["verdict_advice"]}</div>'
-            f'{drivers_html}'
-            f'</div>'
-        )
-        st.markdown(banner_html, unsafe_allow_html=True)
-
-        # 顯示 FRED 總經數據卡片 (CPI, Core PCE, 失業率, 美債利差)
-        if macro_intel["macro_cards"]:
-            m_cols = st.columns(len(macro_intel["macro_cards"]))
-            for idx, mc in enumerate(macro_intel["macro_cards"]):
-                with m_cols[idx]:
-                    c_html = (
-                        f'<div class="baro-card baro-{mc["cls"]}">'
-                        f'<div class="baro-title"><span>{mc["title"]}</span>'
-                        f'<span class="baro-price">{mc["main"]}</span></div>'
-                        f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span>'
-                        f'<div class="baro-sub">{mc["sub"]}</div>'
+    # ── 近期重大財經新聞與 AI 智慧中文摘要 (預設直接展開顯示) ──
+    if auto_intel["news_items"]:
+        with st.expander("📰 近期重大財經新聞 ＆ 智慧摘要分析 (CPI / 聯準會 / 美債 / 台美股動態)", expanded=True):
+            n_cols = st.columns(2)
+            for idx, n_item in enumerate(auto_intel["news_items"][:6]):
+                with n_cols[idx % 2]:
+                    s_color = "#ff5252" if "利空" in n_item["sentiment"] else ("#00e676" if "利多" in n_item["sentiment"] else "#ffca28")
+                    link_html = f'<a href="{n_item["link"]}" target="_blank" style="color:#e0e3eb;text-decoration:none;font-weight:700;">{n_item["title"]} 🔗</a>' if n_item["link"] else f'<b>{n_item["title"]}</b>'
+                    n_html = (
+                        f'<div class="news-card">'
+                        f'<div style="font-size:0.76rem;margin-bottom:4px;">'
+                        f'<span style="color:{s_color};font-weight:800;">{n_item["sentiment"]}</span> ｜ '
+                        f'<span class="metric-pill">{n_item["src"]}</span> '
+                        f'<span class="metric-pill">{n_item["topic"]}</span>'
+                        f'</div>'
+                        f'<div style="font-size:0.86rem;line-height:1.4;margin-bottom:4px;">{link_html}</div>'
+                        f'<div style="font-size:0.78rem;color:#9ba2b0;">💡 <b>摘要解讀：</b>{n_item["impact"]}</div>'
                         f'</div>'
                     )
-                    st.markdown(c_html, unsafe_allow_html=True)
+                    st.markdown(n_html, unsafe_allow_html=True)
 
-        # 顯示跨市場即時資金指標 (VIX, 10Y殖利率, DXY美元, 原油, 黃金)
-        if macro_intel["market_cards"]:
-            mk_cols = st.columns(len(macro_intel["market_cards"]))
-            for idx, mk in enumerate(macro_intel["market_cards"]):
-                with mk_cols[idx]:
-                    chg_col = "#00e676" if mk["chg"] >= 0 else "#ff5252"
-                    mk_html = (
-                        f'<div class="baro-card baro-{mk["cls"]}">'
-                        f'<div class="baro-title"><span>{mk["title"]}</span>'
-                        f'<span class="baro-price">{mk["price"]} <span style="color:{chg_col};font-size:0.80rem;">({mk["chg"]:+.2f}%)</span></span></div>'
-                        f'<span class="baro-badge badge-{mk["cls"]}">{mk["badge"]}</span>'
-                        f'<div class="baro-sub">{mk["sub"]}</div>'
-                        f'</div>'
-                    )
-                    st.markdown(mk_html, unsafe_allow_html=True)
+    st.markdown("---")
 
-        if macro_intel["news_items"]:
-            with st.expander("📰 點此展開：最新國際財經 / CPI 通膨 / 聯準會焦點快訊與 AI 情緒判讀", expanded=False):
-                for n_item in macro_intel["news_items"]:
-                    if n_item["link"]:
-                        st.markdown(f"- **{n_item['sentiment']}** ｜ [{n_item['title']}]({n_item['link']})")
-                    else:
-                        st.markdown(f"- **{n_item['sentiment']}** ｜ {n_item['title']}")
+    # ── 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 (免按掃描直接顯示) ──
+    st.subheader(f"🚥 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ({selected_tf_label})")
 
-        st.markdown("---")
-
-    # ── 第一區：大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ──
-    st.subheader(f"🚥 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ({cache['tf_label']})")
-
+    baro_results = auto_intel["baro_results"]
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
     bull_kws_map = {
         "中樞共振 Buy": "中樞共振Buy", "OB共振支撐": "OB共振支撐", "中樞 Buy": "中樞Buy", "OB支撐確認": "OB支撐",
@@ -1778,9 +1802,120 @@ if "scan_cache" in st.session_state:
             else:
                 st.markdown(f"**{b_tick}** - 暫無數據")
 
-    st.markdown("---")
+st.markdown("---")
 
-    # ── 第二區：即時過濾與嚴格成交量排序 ──
+# ════════════════════════════════════════════════════════════════════════════
+# 第二部分：點擊按鈕後批量掃描個股清單 (寫入快取，支援 0 秒即時過濾與排序)
+# ════════════════════════════════════════════════════════════════════════════
+if scan_btn:
+    favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
+    all_tickers = favorites.copy()
+
+    if scan_us_indices:
+        with st.spinner("🔄 正在取得美股三大指數成分股清單..."):
+            us_stocks, _, _, success = get_us_indices()
+            if not success:
+                st.warning("⚠️ 維基百科連線受限，已切換至核心權值股備用清單。")
+            all_tickers.extend(us_stocks)
+
+    all_tickers = list(dict.fromkeys(all_tickers))
+    if not all_tickers:
+        st.error("❌ 收藏清單是空的！")
+        st.stop()
+
+    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    chunk_size = 80
+    all_scanned_rows = []
+    successful_tickers = set()
+    start_time = time.time()
+    use_fund = not scan_mode.startswith("1")
+
+    for i in range(0, len(all_tickers), chunk_size):
+        batch = all_tickers[i : i + chunk_size]
+        status_text.text(f"⏳ 正在下載與分析個股 K 線: {i} / {len(all_tickers)} ...")
+        try:
+            data = yf.download(batch, period=f"{scan_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+            for t in batch:
+                try:
+                    df_t = data[t] if len(batch) > 1 else data
+                    df_t = df_t.dropna(subset=['Close'])
+                    if len(df_t) > 40:
+                        successful_tickers.add(t)
+                        avg_vol = calc_robust_avg_vol(df_t)
+
+                        df_proc = resample_to_tv_4h(df_t, t) if selected_tf == "4h" else df_t.copy()
+                        res_tech = scan_signals(df_proc, recent_k=recent_k, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
+                        if res_tech is None:
+                            continue
+
+                        pass_tech = res_tech["觸發指標通知"] != ""
+                        pass_fund = False
+                        pe_val, peg_val, pb_val = 0.0, 0.0, 0.0
+
+                        if use_fund:
+                            try:
+                                info = yf.Ticker(t).info
+                                pe_val = float(info.get('trailingPE') or 0)
+                                peg_val = float(info.get('pegRatio') or 0)
+                                pb_val = float(info.get('priceToBook') or 0)
+                                cond_pe = (0 < pe_val <= max_pe) if max_pe > 0 else True
+                                cond_peg = (0 < peg_val <= max_peg) if max_peg > 0 else True
+                                cond_pb = (0 < pb_val <= max_pb) if max_pb > 0 else True
+                                pass_fund = True if (max_pe == 0 and max_peg == 0 and max_pb == 0) else (cond_pe and cond_peg and cond_pb)
+                            except Exception:
+                                pass_fund = False
+
+                        smc_str = f"🟢 多頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == 1 else (
+                            f"🔴 空頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == -1 else "⚪ 震盪整理"
+                        )
+
+                        cur_vol = float(res_tech["當前成交量"])
+                        all_scanned_rows.append({
+                            "Raw_Ticker": t,
+                            "Is_Fav": t in favorites,
+                            "標的代號": f"⭐ {t}" if (t in favorites) else t,
+                            "TV圖表": get_tv_link(t),
+                            "SMC 結構": smc_str,
+                            "最新收盤價": f"{res_tech['最新收盤價']:.2f} ({res_tech['漲跌幅']:+.2f}%)",
+                            "當前成交量": cur_vol,
+                            "日均交易量": avg_vol,
+                            "All_Signals": res_tech["觸發指標通知"],
+                            "最近支撐區": res_tech["最近支撐區"],
+                            "最近壓力區": res_tech["最近壓力區"],
+                            "PEG (市賺率)": f"{peg_val:.2f}" if peg_val > 0 else "N/A",
+                            "P/E": f"{pe_val:.2f}" if pe_val > 0 else "N/A",
+                            "P/B": f"{pb_val:.2f}" if pb_val > 0 else "N/A",
+                            "Pass_Tech": pass_tech,
+                            "Pass_Fund": pass_fund
+                        })
+                except Exception:
+                    continue
+        except Exception:
+            continue
+        progress_bar.progress(min((i + chunk_size) / len(all_tickers), 1.0))
+
+    progress_bar.empty()
+    status_text.empty()
+
+    st.session_state.scan_cache = {
+        "all_scanned_rows": all_scanned_rows,
+        "failed_tickers": [t for t in all_tickers if t not in successful_tickers],
+        "elapsed": int(time.time() - start_time),
+        "tf_label": selected_tf_label,
+        "tf_code": selected_tf
+    }
+
+# ════════════════════════════════════════════════════════════════════════════
+# 個股掃描結果表格渲染區
+# ════════════════════════════════════════════════════════════════════════════
+st.subheader("📋 個股訊號掃描清單")
+
+if "scan_cache" in st.session_state:
+    cache = st.session_state.scan_cache
+    all_scanned_rows = cache["all_scanned_rows"]
+
     use_fund = not scan_mode.startswith("1")
     filtered_rows = []
 
@@ -1827,7 +1962,7 @@ if "scan_cache" in st.session_state:
             cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
         cols_to_show.append("觸發指標通知")
 
-        st.success(f"🎯 掃描完成！共發現 **{len(df_report)}** 檔符合條件的標的 ｜ 已依 **{vol_sort_by}** 由大到小排序 (耗時: {cache['elapsed']} 秒)")
+        st.success(f"🎯 個股掃描完成！共發現 **{len(df_report)}** 檔符合條件的標的 ｜ 已依 **{vol_sort_by}** 由大到小排序 (耗時: {cache['elapsed']} 秒)")
 
         st.dataframe(
             df_report[cols_to_show],
@@ -1856,4 +1991,4 @@ if "scan_cache" in st.session_state:
     else:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
-    st.info("👈 請確認左側參數後，點擊 **「🚀 立即啟動掃描」** 開始分析！")
+    st.info("👆 上方 **「宏觀經濟 × 新聞摘要 × 大盤 24 態風向標」** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**。")
