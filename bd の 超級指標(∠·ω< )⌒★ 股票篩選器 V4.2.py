@@ -8,6 +8,7 @@ import os
 import json
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 
 warnings.filterwarnings("ignore")
 
@@ -15,7 +16,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.6",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.7",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -23,18 +24,18 @@ st.set_page_config(
 
 st.markdown(
     "<style>"
-    ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 15px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
+    ".baro-card { background: linear-gradient(145deg, rgba(30,34,45,0.96), rgba(18,21,28,0.96)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 14px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); color: #e0e3eb; }"
     ".baro-bull { border-left: 5px solid #00e676; }"
     ".baro-bear { border-left: 5px solid #ff5252; }"
     ".baro-warn { border-left: 5px solid #ffca28; }"
-    ".baro-title { font-size: 1.05rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
-    ".baro-price { font-size: 0.92rem; font-family: monospace; color: #00e5ff; }"
-    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }"
+    ".baro-title { font-size: 1.00rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }"
+    ".baro-price { font-size: 0.90rem; font-family: monospace; color: #00e5ff; }"
+    ".baro-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; margin-bottom: 6px; }"
     ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.4); }"
     ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.4); }"
     ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.4); }"
-    ".baro-advice { font-size: 0.85rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }"
-    ".baro-sub { font-size: 0.75rem; color: #9ba2b0; line-height: 1.48; }"
+    ".baro-advice { font-size: 0.84rem; font-weight: 700; color: #ffffff; margin-bottom: 5px; }"
+    ".baro-sub { font-size: 0.74rem; color: #9ba2b0; line-height: 1.45; }"
     ".metric-pill { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: #ffd600; }"
     ".strategy-box { background: linear-gradient(135deg, rgba(20,26,40,0.98), rgba(30,38,56,0.98)); border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 6px 22px rgba(0,0,0,0.4); }"
     ".news-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 9px 12px; margin-bottom: 7px; }"
@@ -42,8 +43,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.6")
-st.caption("開網頁免按鈕自動診斷版：**即時宏觀經濟 × 新聞智慧摘要 × 大盤24態風向標 × 綜合戰術指令 (對沖/做空/抄底/順勢做多)**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V7.7")
+st.caption("全自動 8 大總經指標版：**即時抓取 CPI / PPI / 核心PCE / 非農就業(NFP) / 初領失業金 / 零售銷售 / 殖利率 / 財經新聞摘要 × 大盤24態戰術指揮**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義 (已移除 CHOCH / BOS / 纏論123買賣點)
@@ -1019,33 +1020,37 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     }
 
 # ════════════════════════════════════════════════════════════════════════════
-# 🌐 免按鈕自動載入：新聞智慧中文摘要 + 總經數據 + 大盤 24 態 + 綜合戰術指令
+# 🌐 全自動 8 大官方總經指標 (FRED) + 新聞智慧摘要 + 5大盤 24 態 + 綜合戰術引擎
 # ════════════════════════════════════════════════════════════════════════════
 def translate_and_summarize_news(title):
-    """根據中英文新聞標題自動萃取主題並生成中文影響摘要與多空權重"""
+    """根據中英文新聞標題自動萃取主題 (含 CPI/PPI/非農/初領失業金/零售/Fed) 並生成中文摘要"""
     t_low = title.lower()
     topics = []
-    if any(w in t_low for w in ["cpi", "inflation", "pce", "consumer price", "物價", "通膨"]):
-        topics.append("通膨/CPI數據")
-    if any(w in t_low for w in ["fed", "powell", "warsh", "rate hike", "rate cut", "fomc", "central bank", "聯準會", "升息", "降息", "利率"]):
+    if any(w in t_low for w in ["cpi", "consumer price", "inflation", "物價", "通膨"]):
+        topics.append("CPI通膨")
+    if any(w in t_low for w in ["ppi", "producer price", "wholesale price", "生產者物價"]):
+        topics.append("PPI生產物價")
+    if any(w in t_low for w in ["pce", "personal consumption", "核心pce"]):
+        topics.append("核心PCE")
+    if any(w in t_low for w in ["nonfarm", "payroll", "jobs report", "unemployment", "jobless claims", "非農", "失業率", "初領失業金", "就業"]):
+        topics.append("非農與就業")
+    if any(w in t_low for w in ["retail sales", "consumer spending", "零售銷售", "消費"]):
+        topics.append("零售與消費")
+    if any(w in t_low for w in ["fed", "powell", "rate hike", "rate cut", "fomc", "central bank", "聯準會", "升息", "降息", "利率"]):
         topics.append("Fed利率政策")
     if any(w in t_low for w in ["yield", "treasury", "bond", "10-year", "殖利率", "美債"]):
         topics.append("美債殖利率")
-    if any(w in t_low for w in ["oil", "gasoline", "energy", "iran", "middle east", "油價", "原油", "能源", "中東"]):
-        topics.append("能源與地緣")
+    if any(w in t_low for w in ["oil", "gasoline", "energy", "iran", "middle east", "油價", "原油", "能源", "汽油"]):
+        topics.append("能源與油價")
     if any(w in t_low for w in ["nvda", "nvidia", "tsmc", "semiconductor", "chip", "ai", "台積電", "輝達", "半導體", "晶片"]):
         topics.append("AI與半導體")
-    if any(w in t_low for w in ["tariff", "trade", "china", "關稅", "貿易"]):
-        topics.append("關稅與貿易")
-    if any(w in t_low for w in ["jobs", "unemployment", "payroll", "非農", "失業率", "就業"]):
-        topics.append("就業市場")
 
     topic_str = "・".join(topics[:2]) if topics else "市場焦點動態"
 
     bull_words = [
         "beat", "surge", "rally", "cooling", "eases", "cut", "dovish", "optimism",
         "gain", "bull", "jump", "upgrade", "record high", "soar", "rebound", "growth",
-        "降溫", "利多", "大漲", "降息", "優於預期", "創高", "買超", "走揚", "反彈"
+        "降溫", "利多", "大漲", "降息", "優於預期", "創高", "買超", "走揚", "反彈", "回落"
     ]
     bear_words = [
         "hotter", "accelerates", "tops forecasts", "hike", "hawkish", "inflation rises",
@@ -1060,21 +1065,21 @@ def translate_and_summarize_news(title):
     if s_hits > b_hits:
         sentiment = "🔴 利空衝擊"
         score = -0.6
-        if "通膨/CPI數據" in topic_str or "Fed利率政策" in topic_str:
-            impact = "通膨數據超預期升溫或升息擔憂加劇，推升美債殖利率並壓抑科技股估值"
-        elif "能源與地緣" in topic_str:
-            impact = "汽油與能源價格大漲增添通膨黏著度，壓抑市場風險偏好"
-        elif "AI與半導體" in topic_str:
-            impact = "科技與半導體權值股面臨折現率上升與獲利了結賣壓"
+        if any(k in topic_str for k in ["CPI通膨", "PPI生產物價", "核心PCE", "Fed利率政策"]):
+            impact = "通膨數據(CPI/PPI)偏熱或升息擔憂升溫，推升美債殖利率並壓抑科技股估值"
+        elif "非農與就業" in topic_str:
+            impact = "就業市場數據引發工資通膨或經濟放緩擔憂，增添市場波動"
+        elif "能源與油價" in topic_str:
+            impact = "能源與汽油價格大漲推升整體通膨黏著度，壓抑風險偏好"
         else:
             impact = "市場避險情緒升溫，短線資金偏向保守防禦與減碼"
     elif b_hits > s_hits:
         sentiment = "🟢 利多支撐"
         score = 0.6
-        if "通膨/CPI數據" in topic_str or "Fed利率政策" in topic_str:
-            impact = "通膨趨緩或政策轉鴿預期，有利資金回流風險資產"
-        elif "AI與半導體" in topic_str:
-            impact = "AI 與半導體需求強勁，支撐權值股與大盤多頭人氣"
+        if any(k in topic_str for k in ["CPI通膨", "PPI生產物價", "核心PCE", "Fed利率政策"]):
+            impact = "通膨趨緩或政策轉鴿預期，有利資金回流科技與成長股"
+        elif "非農與就業" in topic_str or "零售與消費" in topic_str:
+            impact = "就業與消費基本面展現韌性，支撐經濟軟著陸預期"
         else:
             impact = "市場買盤信心回溫，支撐指數偏多表現"
     else:
@@ -1094,138 +1099,248 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
     bear_score = 0.0
     key_drivers = []
 
-    # ── 1. 抓取聯準會 FRED 官方公開 CSV 數據 ──
-    def get_fred_series(series_id, tail_n=18):
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            df_f = pd.read_csv(resp)
-        df_f.columns = ['DATE', 'VAL']
-        df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
-        return df_f.dropna().tail(tail_n).reset_index(drop=True)
+    # ── 1. 多執行緒並行抓取聯準會 FRED 9 大核心經濟數據 Series ──
+    fred_ids = [
+        "CPIAUCSL",  # 1. CPI 消費者物價指數
+        "CPILFESL",  # 2. 核心 CPI (不含食品與能源)
+        "PPIACO",    # 3. PPI 生產者物價指數 (全部商品)
+        "PCEPILFE",  # 4. 核心 PCE 物價指數 (Fed最重視)
+        "PAYEMS",    # 5. 非農就業總人數 (計算單月新增非農 NFP)
+        "UNRATE",    # 6. 失業率
+        "ICSA",      # 7. 當週初領失業金人數 (高頻每週公布)
+        "RSAFS",     # 8. 零售銷售額 (觀察消費動能)
+        "T10Y2Y",    # 9. 10Y-2Y 美債殖利率利差
+        "DFF"        # 10. 聯邦基金有效利率
+    ]
 
-    # (A) 美國 CPI 消費者物價指數 (CPIAUCSL) 與核心 CPI (CPILFESL)
-    try:
-        df_cpi = get_fred_series("CPIAUCSL", 16)
-        df_core = get_fred_series("CPILFESL", 16)
-        if len(df_cpi) >= 14:
-            yoy_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-13] - 1.0) * 100.0
-            yoy_prev = (df_cpi['VAL'].iloc[-2] / df_cpi['VAL'].iloc[-14] - 1.0) * 100.0
-            mom_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-2] - 1.0) * 100.0
-            cpi_date = str(df_cpi['DATE'].iloc[-1])[:7]
-            diff_yoy = yoy_now - yoy_prev
+    def fetch_one_fred(sid):
+        try:
+            url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                df_f = pd.read_csv(resp)
+            df_f.columns = ['DATE', 'VAL']
+            df_f['VAL'] = pd.to_numeric(df_f['VAL'], errors='coerce')
+            return sid, df_f.dropna().tail(18).reset_index(drop=True)
+        except Exception:
+            return sid, pd.DataFrame()
 
-            core_str = ""
-            if len(df_core) >= 14:
-                c_yoy = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-13] - 1.0) * 100.0
-                c_mom = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-2] - 1.0) * 100.0
-                core_str = f" ｜ 核心年增 {c_yoy:.1f}%(月+{c_mom:.1f}%)"
+    fred_dict = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        for sid, df_res in ex.map(fetch_one_fred, fred_ids):
+            fred_dict[sid] = df_res
 
-            if yoy_now > yoy_prev + 0.05 or mom_now >= 0.4:
-                bias, cls = "🔴 通膨升溫 (鷹派升息警戒)", "bear"
-                bear_score += 2.5
-                key_drivers.append(f"最新美國 CPI 年增加速至 {yoy_now:.1f}% (前值 {yoy_prev:.1f}%、月增 {mom_now:+.1f}%){core_str}，汽油與能源飆升推升 Fed 升息擔憂")
-            elif yoy_now < yoy_prev - 0.05 and mom_now <= 0.25:
-                bias, cls = "🟢 通膨降溫 (鴿派利多股市)", "bull"
-                bull_score += 2.5
-                key_drivers.append(f"最新美國 CPI 年增降至 {yoy_now:.1f}%，通膨降溫有利科技股估值擴張")
-            else:
-                bias, cls = "🟡 通膨黏著 (高檔震盪)", "warn"
+    # (1) 美國 CPI 與核心 CPI (CPIAUCSL / CPILFESL)
+    df_cpi = fred_dict.get("CPIAUCSL", pd.DataFrame())
+    df_core = fred_dict.get("CPILFESL", pd.DataFrame())
+    if len(df_cpi) >= 14:
+        yoy_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-13] - 1.0) * 100.0
+        yoy_prev = (df_cpi['VAL'].iloc[-2] / df_cpi['VAL'].iloc[-14] - 1.0) * 100.0
+        mom_now = (df_cpi['VAL'].iloc[-1] / df_cpi['VAL'].iloc[-2] - 1.0) * 100.0
+        raw_dt = str(df_cpi['DATE'].iloc[-1])
+        cpi_date = raw_dt[:7]
+        diff_yoy = yoy_now - yoy_prev
 
-            macro_cards.append({
-                "title": f"🇺🇸 美國 CPI 通膨 ({cpi_date})",
-                "main": f"{yoy_now:.1f}%",
-                "sub": f"前值 {yoy_prev:.1f}% ({diff_yoy:+.1f}%) ｜ 月增 {mom_now:+.1f}%{core_str}",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
+        core_str = ""
+        if len(df_core) >= 14:
+            c_yoy = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-13] - 1.0) * 100.0
+            c_mom = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-2] - 1.0) * 100.0
+            core_str = f" ｜ 核心 {c_yoy:.1f}%(月+{c_mom:.1f}%)"
 
-    # (B) 美國核心 PCE 物價指數 (PCEPILFE)
-    try:
-        df_pce = get_fred_series("PCEPILFE", 16)
-        if len(df_pce) >= 14:
-            pce_yoy = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-13] - 1.0) * 100.0
-            pce_prev = (df_pce['VAL'].iloc[-2] / df_pce['VAL'].iloc[-14] - 1.0) * 100.0
-            pce_mom = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-2] - 1.0) * 100.0
-            pce_date = str(df_pce['DATE'].iloc[-1])[:7]
-            diff_pce = pce_yoy - pce_prev
+        if yoy_now > yoy_prev + 0.05 or mom_now >= 0.4:
+            bias, cls = "🔴 通膨升溫 (鷹派升息警戒)", "bear"
+            bear_score += 2.5
+            key_drivers.append(f"【CPI 通膨】最新年增率升至 {yoy_now:.1f}% (前值 {yoy_prev:.1f}%、月增 {mom_now:+.1f}%){core_str}，通膨反彈壓抑科技股估值")
+        elif yoy_now < yoy_prev - 0.05 and mom_now <= 0.25:
+            bias, cls = "🟢 通膨降溫 (鴿派利多股市)", "bull"
+            bull_score += 2.5
+            key_drivers.append(f"【CPI 通膨】最新年增率降至 {yoy_now:.1f}%，通膨降溫有利估值擴張")
+        else:
+            bias, cls = "🟡 通膨黏著 (高檔震盪)", "warn"
 
-            if pce_yoy > pce_prev + 0.05 or pce_yoy >= 2.6:
-                bias, cls = "🔴 核心通膨偏高 (高利率維持)", "bear"
-                bear_score += 1.0
-            elif pce_yoy < pce_prev:
-                bias, cls = "🟢 核心通膨受控 (軟著陸利多)", "bull"
-                bull_score += 1.0
-            else:
-                bias, cls = "🟡 核心通膨持平", "warn"
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🇺🇸 美國 CPI 通膨 ({cpi_date})",
+            "main": f"{yoy_now:.1f}%",
+            "sub": f"前值 {yoy_prev:.1f}% ({diff_yoy:+.1f}%) ｜ 月增 {mom_now:+.1f}%{core_str}",
+            "badge": bias, "cls": cls
+        })
 
-            macro_cards.append({
-                "title": f"🎯 核心 PCE 年增 ({pce_date})",
-                "main": f"{pce_yoy:.2f}%",
-                "sub": f"前值 {pce_prev:.2f}% ({diff_pce:+.2f}%) ｜ 月增 {pce_mom:+.2f}%",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
+    # (2) 美國 PPI 生產者物價指數 (PPIACO - 上游通膨領先指標)
+    df_ppi = fred_dict.get("PPIACO", pd.DataFrame())
+    if len(df_ppi) >= 14:
+        ppi_yoy = (df_ppi['VAL'].iloc[-1] / df_ppi['VAL'].iloc[-13] - 1.0) * 100.0
+        ppi_prev = (df_ppi['VAL'].iloc[-2] / df_ppi['VAL'].iloc[-14] - 1.0) * 100.0
+        ppi_mom = (df_ppi['VAL'].iloc[-1] / df_ppi['VAL'].iloc[-2] - 1.0) * 100.0
+        raw_dt = str(df_ppi['DATE'].iloc[-1])
+        ppi_date = raw_dt[:7]
+        diff_ppi = ppi_yoy - ppi_prev
 
-    # (C) 美國非農失業率 (UNRATE)
-    try:
-        df_un = get_fred_series("UNRATE", 6)
-        if len(df_un) >= 3:
-            un_now = float(df_un['VAL'].iloc[-1])
-            un_prev = float(df_un['VAL'].iloc[-2])
-            un_date = str(df_un['DATE'].iloc[-1])[:7]
-            diff_un = un_now - un_prev
+        if ppi_mom >= 0.4 or ppi_yoy > ppi_prev + 0.3:
+            bias, cls = "🔴 上游物價攀升 (轉嫁CPI壓力)", "bear"
+            bear_score += 1.5
+            key_drivers.append(f"【PPI 生產者物價】年增 {ppi_yoy:.1f}% (月增 {ppi_mom:+.1f}%)，上游生產成本上升增添通膨壓力")
+        elif ppi_mom <= 0.1 or ppi_yoy < ppi_prev - 0.2:
+            bias, cls = "🟢 上游成本降溫 (利好企業毛利)", "bull"
+            bull_score += 1.5
+        else:
+            bias, cls = "🟡 生產端物價溫和", "warn"
 
-            if un_now >= 4.4 or diff_un >= 0.2:
-                bias, cls = "🔴 失業率攀升 (留意硬著陸風險)", "bear"
-                bear_score += 1.0
-                key_drivers.append(f"失業率升至 {un_now:.1f}%，勞動市場降溫")
-            elif un_now <= 4.2 and diff_un <= 0.0:
-                bias, cls = "🟢 就業穩健 (支撐經濟基本面)", "bull"
-                bull_score += 1.0
-            else:
-                bias, cls = "🟡 勞動市場溫和放緩", "warn"
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🏭 美國 PPI 物價 ({ppi_date})",
+            "main": f"{ppi_yoy:.1f}%",
+            "sub": f"前值 {ppi_prev:.1f}% ({diff_ppi:+.1f}%) ｜ 月增 {ppi_mom:+.1f}%",
+            "badge": bias, "cls": cls
+        })
 
-            macro_cards.append({
-                "title": f"👷 非農失業率 ({un_date})",
-                "main": f"{un_now:.1f}%",
-                "sub": f"前值 {un_prev:.1f}% (變動 {diff_un:+.1f}%)",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
+    # (3) 美國非農就業報告：單月新增非農人數 (PAYEMS) + 失業率 (UNRATE)
+    df_nfp = fred_dict.get("PAYEMS", pd.DataFrame())
+    df_un = fred_dict.get("UNRATE", pd.DataFrame())
+    if len(df_nfp) >= 3 and len(df_un) >= 3:
+        nfp_add = float(df_nfp['VAL'].iloc[-1] - df_nfp['VAL'].iloc[-2])  # 單位：千人 (K)
+        nfp_prev = float(df_nfp['VAL'].iloc[-2] - df_nfp['VAL'].iloc[-3])
+        un_now = float(df_un['VAL'].iloc[-1])
+        un_prev = float(df_un['VAL'].iloc[-2])
+        raw_dt = str(df_nfp['DATE'].iloc[-1])
+        nfp_date = raw_dt[:7]
 
-    # (D) 10Y-2Y 美債殖利率利差 (T10Y2Y)
-    try:
-        df_sp = get_fred_series("T10Y2Y", 10)
-        if len(df_sp) >= 2:
-            sp_now = float(df_sp['VAL'].iloc[-1])
-            sp_prev = float(df_sp['VAL'].iloc[-5]) if len(df_sp) >= 5 else float(df_sp['VAL'].iloc[-2])
-            sp_date = str(df_sp['DATE'].iloc[-1])[:10]
+        if nfp_add < 50 or un_now >= 4.5:
+            bias, cls = "🔴 就業顯著降溫 (提防衰退風險)", "bear"
+            bear_score += 1.5
+            key_drivers.append(f"【非農就業 NFP】單月新增 {nfp_add:+.0f}K、失業率 {un_now:.1f}%，勞動市場明顯轉弱")
+        elif nfp_add > 250 and un_now <= 4.1:
+            bias, cls = "🟡 就業過熱 (支撐經濟但添鷹派擔憂)", "warn"
+            bear_score += 0.5
+        else:
+            bias, cls = "🟢 非農就業穩健 (金髮女孩軟著陸)", "bull"
+            bull_score += 1.5
 
-            if sp_now < 0:
-                bias, cls = "🔴 殖利率倒掛 (信貸緊縮警戒)", "bear"
-                bear_score += 1.0
-            elif sp_now > 0.45:
-                bias, cls = "🟡 長債殖利率陡峭化", "warn"
-            else:
-                bias, cls = "🟢 殖利率曲線正常化", "bull"
-                bull_score += 0.5
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"👷 非農就業 NFP ({nfp_date})",
+            "main": f"{nfp_add:+.0f}K",
+            "sub": f"前值 {nfp_prev:+.0f}K ｜ 失業率 {un_now:.1f}% (前值 {un_prev:.1f}%)",
+            "badge": bias, "cls": cls
+        })
 
-            macro_cards.append({
-                "title": f"🏦 10Y-2Y 殖利率差 ({sp_date})",
-                "main": f"{sp_now:+.2f}%",
-                "sub": f"一週前 {sp_prev:+.2f}% ｜ 長短天期利差結構",
-                "badge": bias,
-                "cls": cls
-            })
-    except Exception:
-        pass
+    # (4) 當週初領失業金人數 (ICSA - 每週更新的高頻指標)
+    df_icsa = fred_dict.get("ICSA", pd.DataFrame())
+    if len(df_icsa) >= 3:
+        ic_now = float(df_icsa['VAL'].iloc[-1]) / 1000.0  # 轉為 K
+        ic_prev = float(df_icsa['VAL'].iloc[-2]) / 1000.0
+        raw_dt = str(df_icsa['DATE'].iloc[-1])
+        diff_ic = ic_now - ic_prev
+
+        if ic_now >= 250 or diff_ic >= 15:
+            bias, cls = "🔴 初領失業金攀升 (裁員增加)", "bear"
+            bear_score += 1.0
+        elif ic_now <= 225:
+            bias, cls = "🟢 勞動市場具韌性 (低裁員率)", "bull"
+            bull_score += 1.0
+        else:
+            bias, cls = "🟡 初領失業金符合預期", "warn"
+
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🧾 初領失業金 ({raw_dt[5:]})",
+            "main": f"{ic_now:.0f}K",
+            "sub": f"前週 {ic_prev:.0f}K ({diff_ic:+.0f}K) ｜ 每週高頻就業指標",
+            "badge": bias, "cls": cls
+        })
+
+    # (5) 核心 PCE 物價指數 (PCEPILFE - 聯準會最青睞通膨指標)
+    df_pce = fred_dict.get("PCEPILFE", pd.DataFrame())
+    if len(df_pce) >= 14:
+        pce_yoy = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-13] - 1.0) * 100.0
+        pce_prev = (df_pce['VAL'].iloc[-2] / df_pce['VAL'].iloc[-14] - 1.0) * 100.0
+        pce_mom = (df_pce['VAL'].iloc[-1] / df_pce['VAL'].iloc[-2] - 1.0) * 100.0
+        raw_dt = str(df_pce['DATE'].iloc[-1])
+        pce_date = raw_dt[:7]
+        diff_pce = pce_yoy - pce_prev
+
+        if pce_yoy > pce_prev + 0.05 or pce_yoy >= 2.6:
+            bias, cls = "🔴 核心PCE偏高 (高利率維持)", "bear"
+            bear_score += 1.0
+        elif pce_yoy < pce_prev:
+            bias, cls = "🟢 核心PCE受控 (軟著陸利多)", "bull"
+            bull_score += 1.0
+        else:
+            bias, cls = "🟡 核心PCE持平", "warn"
+
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🎯 核心 PCE 年增 ({pce_date})",
+            "main": f"{pce_yoy:.2f}%",
+            "sub": f"前值 {pce_prev:.2f}% ({diff_pce:+.2f}%) ｜ 月增 {pce_mom:+.2f}%",
+            "badge": bias, "cls": cls
+        })
+
+    # (6) 美國零售銷售月增率 (RSAFS - 觀察內需消費力道)
+    df_ret = fred_dict.get("RSAFS", pd.DataFrame())
+    if len(df_ret) >= 14:
+        ret_mom = (df_ret['VAL'].iloc[-1] / df_ret['VAL'].iloc[-2] - 1.0) * 100.0
+        ret_yoy = (df_ret['VAL'].iloc[-1] / df_ret['VAL'].iloc[-13] - 1.0) * 100.0
+        raw_dt = str(df_ret['DATE'].iloc[-1])
+        ret_date = raw_dt[:7]
+
+        if ret_mom >= 0.3:
+            bias, cls = "🟢 消費動能強勁 (支撐企業獲利)", "bull"
+            bull_score += 1.0
+        elif ret_mom <= -0.3:
+            bias, cls = "🔴 零售消費萎縮 (內需轉弱警訊)", "bear"
+            bear_score += 1.0
+        else:
+            bias, cls = "🟡 消費力道溫和", "warn"
+
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🛒 美國零售銷售 ({ret_date})",
+            "main": f"{ret_mom:+.2f}%",
+            "sub": f"年增率 {ret_yoy:+.1f}% ｜ 美國 GDP 70% 消費引擎指標",
+            "badge": bias, "cls": cls
+        })
+
+    # (7) 10Y-2Y 美債殖利率利差 (T10Y2Y)
+    df_sp = fred_dict.get("T10Y2Y", pd.DataFrame())
+    if len(df_sp) >= 5:
+        sp_now = float(df_sp['VAL'].iloc[-1])
+        sp_prev = float(df_sp['VAL'].iloc[-5])
+        raw_dt = str(df_sp['DATE'].iloc[-1])
+
+        if sp_now < 0:
+            bias, cls = "🔴 殖利率倒掛 (信貸緊縮警戒)", "bear"
+            bear_score += 1.0
+        elif sp_now > 0.45:
+            bias, cls = "🟡 長債殖利率陡峭化", "warn"
+        else:
+            bias, cls = "🟢 殖利率曲線正常化", "bull"
+            bull_score += 0.5
+
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🏦 10Y-2Y 美債利差 ({raw_dt[5:]})",
+            "main": f"{sp_now:+.2f}%",
+            "sub": f"一週前 {sp_prev:+.2f}% ｜ 景氣循環與銀行利差指標",
+            "badge": bias, "cls": cls
+        })
+
+    # (8) 聯準會有效基準利率 (DFF)
+    df_dff = fred_dict.get("DFF", pd.DataFrame())
+    if len(df_dff) >= 2:
+        dff_now = float(df_dff['VAL'].iloc[-1])
+        dff_prev = float(df_dff['VAL'].iloc[-10]) if len(df_dff) >= 10 else float(df_dff['VAL'].iloc[0])
+        raw_dt = str(df_dff['DATE'].iloc[-1])
+        macro_cards.append({
+            "sort_dt": raw_dt,
+            "title": f"🏛️ Fed 基準利率 ({raw_dt[5:]})",
+            "main": f"{dff_now:.2f}%",
+            "sub": f"前期 {dff_prev:.2f}% ｜ 聯邦基金有效利率 (EFFR)",
+            "badge": "🟡 緊盯 FOMC 利率決議動向", "cls": "warn"
+        })
+
+    # 依照數據最新日期排序（越近期更新的排越前面）
+    macro_cards.sort(key=lambda x: x["sort_dt"], reverse=True)
 
     # ── 2. 抓取跨市場即時資金指標 (VIX, 10Y美債, 美元指數, 原油, 黃金) ──
     cross_tickers = ["^VIX", "^TNX", "DX-Y.NYB", "CL=F", "GC=F"]
@@ -1249,7 +1364,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             if v_val >= 21.5 or v_1d >= 6.5:
                 v_badge, v_cls = "🔴 避險情緒升溫 (美股承壓)", "bear"
                 bear_score += 2.0
-                key_drivers.append(f"VIX 恐慌指數跳升至 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
+                key_drivers.append(f"【VIX 恐慌指數】跳升至 {v_val:.2f} ({v_1d:+.1f}%)，機構避險買盤湧入")
             elif v_val < 16.5 and v_1d <= 0:
                 v_badge, v_cls = "🟢 市場情緒穩定 (有利多頭)", "bull"
                 bull_score += 2.0
@@ -1269,11 +1384,11 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             if t_val >= 4.40 or t_1d >= 1.5 or t_5d >= 2.5:
                 t_badge, t_cls = "🔴 殖利率走高 (壓抑科技股估值)", "bear"
                 bear_score += 2.0
-                key_drivers.append(f"10年期美債殖利率攀升至 {t_val:.2f}% ({t_1d:+.1f}%)，無風險利率上升壓抑高估值科技股")
+                key_drivers.append(f"【10Y 美債殖利率】攀升至 {t_val:.2f}% ({t_1d:+.1f}%)，無風險利率上升壓抑高估值科技股")
             elif t_1d < -1.2 or t_5d < -2.0:
                 t_badge, t_cls = "🟢 殖利率回落 (資金回流成長股)", "bull"
                 bull_score += 2.0
-                key_drivers.append(f"10年期美債殖利率回落至 {t_val:.2f}%，緩解科技股折現率壓力")
+                key_drivers.append(f"【10Y 美債殖利率】回落至 {t_val:.2f}%，緩解科技股折現率壓力")
             else:
                 t_badge, t_cls = "🟡 殖利率高檔整理", "warn"
             market_cards.append({
@@ -1287,7 +1402,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
             if d_1d >= 0.30 or d_5d >= 0.9:
                 d_badge, d_cls = "🔴 美元轉強 (外資易自台股流出)", "bear"
                 bear_score += 1.5
-                key_drivers.append(f"美元指數轉強至 {d_val:.2f} ({d_1d:+.2f}%)，不利台股外資資金面與非美資產")
+                key_drivers.append(f"【DXY 美元指數】轉強至 {d_val:.2f} ({d_1d:+.2f}%)，不利台股外資資金面與非美資產")
             elif d_1d <= -0.30 or d_5d <= -0.8:
                 d_badge, d_cls = "🟢 美元走弱 (利好台股與風險資產)", "bull"
                 bull_score += 1.5
@@ -1302,9 +1417,9 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         if oil_info:
             o_val, o_1d, o_5d = oil_info
             if o_val >= 80.0 or o_1d >= 2.0 or o_5d >= 4.5:
-                o_badge, o_cls = "🔴 油價走高 (推升汽油與CPI通膨)", "bear"
+                o_badge, o_cls = "🔴 油價走高 (推升汽油與CPI/PPI)", "bear"
                 bear_score += 1.5
-                key_drivers.append(f"WTI 原油報 ${o_val:.2f} (5日 {o_5d:+.1f}%)，油價與能源成本上揚成為推升 CPI 通膨主因")
+                key_drivers.append(f"【WTI 原油】報 ${o_val:.2f} (5日 {o_5d:+.1f}%)，能源成本上揚推升 CPI 與 PPI 通膨預期")
             elif o_val <= 70.0 or o_5d <= -4.0:
                 o_badge, o_cls = "🟢 油價回落 (緩解通膨與企業成本)", "bull"
                 bull_score += 1.5
@@ -1326,11 +1441,11 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
     except Exception:
         pass
 
-    # ── 3. 自動抓取中英文重大財經/CPI/台美股新聞並生成智慧摘要 ──
+    # ── 3. 自動抓取中英文重大財經/CPI/PPI/非農/台美股新聞並生成智慧摘要 ──
     seen_titles = set()
     rss_sources = [
-        ("🇺🇸 國際總經/CPI", "https://news.google.com/rss/search?q=US+CPI+inflation+OR+Federal+Reserve+rate+OR+Treasury+yields+when:2d&hl=en-US&gl=US&ceid=US:en"),
-        ("🇹🇼 台美股/財經", "https://news.google.com/rss/search?q=%E7%BE%8E%E5%9C%8BCPI+OR+%E8%81%AF%E6%BA%96%E6%9C%83+OR+%E5%8F%B0%E8%82%A1+OR+%E5%8F%B0%E7%A9%8D%E9%9B%BB+when:2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
+        ("🇺🇸 美國總經數據", "https://news.google.com/rss/search?q=US+CPI+OR+PPI+OR+Nonfarm+Payrolls+OR+Jobless+Claims+OR+Retail+Sales+OR+Federal+Reserve+when:3d&hl=en-US&gl=US&ceid=US:en"),
+        ("🇹🇼 台美股/財經", "https://news.google.com/rss/search?q=CPI+OR+PPI+OR+%E9%9D%9E%E8%BE%B2+OR+%E8%81%AF%E6%BA%96%E6%9C%83+OR+%E5%8F%B0%E8%82%A1+OR+%E5%8F%B0%E7%A9%8D%E9%9B%BB+when:2d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant")
     ]
 
     for src_tag, rss_url in rss_sources:
@@ -1427,7 +1542,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         tactical_mode = "🛡️ 【買入對沖 (Hedge) ／ 逢高減碼防守】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**宏觀經濟與資金面偏空**（如 CPI 通膨反彈、美債殖利率與美元跳升壓抑估值），但**大盤指數仍處於多頭結構或高檔震盪**。"
+            "目前**宏觀經濟與資金面偏空**（如 CPI/PPI 通膨反彈、美債殖利率與美元走高壓抑估值），但**大盤指數仍處於多頭結構或高檔震盪**。"
             "這種「基本面逆風 vs 技術面高檔」最容易引發突發性補跌或誘多殺盤！\n"
             "👉 **實戰建議**：切勿在突破時追高！現有多單建議逢反彈至壓力區減碼，或配置 **SQQQ / SPXS / 台指空單 / VIX 避險部位進行對沖 (Hedge)**；若要做多僅能等待回踩「🌟中樞共振 / 🟪OB共振支撐」收腳確認。"
         )
@@ -1463,7 +1578,7 @@ def fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_
         tactical_mode = "⚖️ 【多空雙向區間操作 ／ 重個股輕指數 (選股不選市)】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**宏觀數據（通膨/利率預期）與大盤技術結構處於多空拉鋸消化期**，指數空間有限、個股強弱分化劇烈。\n"
+            "目前**宏觀數據（通膨/就業/利率預期）與大盤技術結構處於多空拉鋸消化期**，指數空間有限、個股強弱分化劇烈。\n"
             "👉 **實戰建議**：避免追高殺低！逢低在 **OB/中樞共振支撐做多**，逢高遇 **OB/中樞壓力或頂部預警獲利了結/短空對沖**，嚴控部位在 5～6 成水位。"
         )
 
@@ -1603,9 +1718,9 @@ with col_b2:
     scan_btn = st.button("🚀 掃描個股清單", type="primary", use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 第一部分：免按鈕自動執行！打開網頁直接呈現「宏觀經濟 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
+# 第一部分：免按鈕自動執行！打開網頁直接呈現「8大總經指標 × 新聞摘要 × 大盤24態 × 綜合戰術指令」
 # ════════════════════════════════════════════════════════════════════════════
-with st.spinner("🌐 正在自動同步全球最新 CPI/總經數據、財經新聞摘要與 5 大盤 24 態結構..."):
+with st.spinner("🌐 正在自動同步 FRED 8大總經指標 (CPI/PPI/非農/初領失業金/PCE/零售)、即時新聞摘要與 5 大盤結構..."):
     auto_intel = fetch_auto_macro_and_barometer(selected_tf, scan_days, strict_confirm, show_swing_ob)
 
 if auto_intel:
@@ -1637,23 +1752,28 @@ if auto_intel:
     )
     st.markdown(strat_html, unsafe_allow_html=True)
 
-    # ── 總經數據卡片 (CPI / 核心PCE / 失業率 / 殖利率差) ──
+    # ── 8 大 FRED 總經數據卡片 (依最新更新日期排序，分 2 排 4 欄呈現) ──
     if auto_intel["macro_cards"]:
-        m_cols = st.columns(len(auto_intel["macro_cards"]))
-        for idx, mc in enumerate(auto_intel["macro_cards"]):
-            with m_cols[idx]:
-                c_html = (
-                    f'<div class="baro-card baro-{mc["cls"]}">'
-                    f'<div class="baro-title"><span>{mc["title"]}</span>'
-                    f'<span class="baro-price">{mc["main"]}</span></div>'
-                    f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span>'
-                    f'<div class="baro-sub">{mc["sub"]}</div>'
-                    f'</div>'
-                )
-                st.markdown(c_html, unsafe_allow_html=True)
+        st.caption("📊 **美國聯準會 FRED 官方總經數據自動判讀 (依最新數據期別排序：涵蓋 CPI / PPI / 非農 NFP / 初領失業金 / 核心 PCE / 零售銷售 / 殖利率差)**")
+        cards = auto_intel["macro_cards"]
+        for row_start in range(0, len(cards), 4):
+            row_items = cards[row_start : row_start + 4]
+            m_cols = st.columns(4)
+            for idx, mc in enumerate(row_items):
+                with m_cols[idx]:
+                    c_html = (
+                        f'<div class="baro-card baro-{mc["cls"]}">'
+                        f'<div class="baro-title"><span>{mc["title"]}</span>'
+                        f'<span class="baro-price">{mc["main"]}</span></div>'
+                        f'<span class="baro-badge badge-{mc["cls"]}">{mc["badge"]}</span>'
+                        f'<div class="baro-sub">{mc["sub"]}</div>'
+                        f'</div>'
+                    )
+                    st.markdown(c_html, unsafe_allow_html=True)
 
     # ── 跨市場即時資金風向標 (VIX / 10Y美債 / 美元 / 原油 / 黃金) ──
     if auto_intel["market_cards"]:
+        st.caption("💹 **跨市場即時資金風向標 (VIX 恐慌 / 10Y 美債殖利率 / DXY 美元指數 / WTI 原油 / 黃金)**")
         mk_cols = st.columns(len(auto_intel["market_cards"]))
         for idx, mk in enumerate(auto_intel["market_cards"]):
             with mk_cols[idx]:
@@ -1670,7 +1790,7 @@ if auto_intel:
 
     # ── 近期重大財經新聞與 AI 智慧中文摘要 (預設直接展開顯示) ──
     if auto_intel["news_items"]:
-        with st.expander("📰 近期重大財經新聞 ＆ 智慧摘要分析 (CPI / 聯準會 / 美債 / 台美股動態)", expanded=True):
+        with st.expander("📰 近期重大財經新聞 ＆ 智慧摘要分析 (自動抓取 CPI / PPI / 非農 / 聯準會 / 台美股動態)", expanded=True):
             n_cols = st.columns(2)
             for idx, n_item in enumerate(auto_intel["news_items"][:6]):
                 with n_cols[idx % 2]:
@@ -1991,4 +2111,4 @@ if "scan_cache" in st.session_state:
     else:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
-    st.info("👆 上方 **「宏觀經濟 × 新聞摘要 × 大盤 24 態風向標」** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**。")
+    st.info("👆 上方 **「8 大總經指標 × 新聞摘要 × 大盤 24 態風向標」** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**。")
