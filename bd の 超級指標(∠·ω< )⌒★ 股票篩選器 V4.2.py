@@ -1941,7 +1941,7 @@ with col_s1:
 with col_s2:
     max_days = 60 if selected_tf in ["15m"] else (730 if selected_tf in ["1h", "4h"] else 1000)
     default_days = max(20, min(int(user_config.get("scan_days", 180)), max_days))
-    scan_days = st.number_input("歷史天數 (影響中樞完整度)", min_value=20, max_value=max_days, value=default_days)
+    scan_days = st.number_input("歷史天數", min_value=20, max_value=max_days, value=default_days, help="天數越長，纏論中樞與 ATR(200) 結構越完整")
 
 sort_opts = ["日均交易量 (推薦)", "當前K棒成交量"]
 sort_idx = 0 if user_config.get("vol_sort_by", "日均交易量 (推薦)") == "日均交易量 (推薦)" else 1
