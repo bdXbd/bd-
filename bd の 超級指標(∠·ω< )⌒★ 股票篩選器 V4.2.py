@@ -2562,3 +2562,10 @@ if "scan_cache" in st.session_state:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
     st.info("👆 上方 **宏觀經濟** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
+
+with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給AI)", expanded=False):
+    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n"
+    ai_report += f"【大盤與總經摘要】\n{macro_summary_str if 'macro_summary_str' in locals() else '詳見下表'}\n\n"
+    ai_report += "【個股與ETF訊號掃描結果】\n"
+    ai_report += df_res.to_markdown(index=False) if not df_res.empty else "目前無觸發訊號"
+    st.code(ai_report, language="markdown")
