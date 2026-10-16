@@ -2563,9 +2563,29 @@ if "scan_cache" in st.session_state:
 else:
     st.info("👆 上方 **宏觀經濟** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
 
-with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給AI)", expanded=False):
-    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n"
-    ai_report += f"【大盤與總經摘要】\n{macro_summary_str if 'macro_summary_str' in locals() else '詳見下表'}\n\n"
-    ai_report += "【個股與ETF訊號掃描結果】\n"
-    ai_report += df_res.to_markdown(index=False) if not df_res.empty else "目前無觸發訊號"
-    st.code(ai_report, language="markdown")
+# ── 🤖 AI 戰情室一鍵複製區塊 (自動偵測 DataFrame 變數，絕不報 NameError) ──
+with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給 AI)", expanded=True):
+    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+    
+    # 自動從記憶體中尋找最後產生的個股掃描結果 DataFrame
+    target_df = None
+    for var_name in ['df_res', 'res_df', 'df_show', 'display_df', 'df_filtered', 'df_final', 'df_out', 'df']:
+        if var_name in locals() and isinstance(locals()[var_name], pd.DataFrame) and len(locals()[var_name].columns) >= 4:
+            target_df = locals()[var_name]
+            break
+            
+    # 若上述常見名稱都沒命中，自動抓取當前頁面最後一個大於 4 欄的 DataFrame
+    if target_df is None:
+        for k, v in list(locals().items())[::-1]:
+            if isinstance(v, pd.DataFrame) and len(v.columns) >= 4 and not k.startswith('_'):
+                target_df = v
+                break
+
+    if target_df is not None and not target_df.empty:
+        ai_report += f"【個股與 ETF 訊號掃描結果（共 {len(target_df)} 檔）】\n"
+        # 使用 to_csv(sep='|') 取代 to_markdown()，免除 Streamlit Cloud 缺少 tabulate 套件的報錯風險
+        ai_report += target_df.to_csv(sep='|', index=False)
+    else:
+        ai_report += "⚠️ 尚未偵測到掃描結果表格（請先點擊上方執行掃描，或確認此段代碼貼在 st.dataframe 顯示表格的同一層縮排下方）。"
+        
+    st.code(ai_report, language="text")
