@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化 + 動態載入動畫特效
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.4",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.5",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -71,8 +71,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.4")
-st.caption("機構級高對比戰情版：**跨網域 Proxy 穿透 FRED 封鎖 × 新聞數據即時校準 (9月CPI 3.7% 紅燈警戒) × 0.2秒即時跳動碼錶 × 大盤24態風向標**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.5")
+st.caption("機構級高對比戰情版：**精準多空權重決策引擎 × 跨網域 Proxy 穿透 FRED × 9月CPI 3.7% 紅燈警戒 × 0.2秒即時碼錶 × 大盤24態風向標**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義
@@ -952,8 +952,14 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         if ev['sig_str'] not in latest_signals:
             latest_signals.append(ev['sig_str'])
 
+    # 修正漲跌幅計算：若最新一根 K 棒剛開盤與前一根完全同價 (+0.00%)，自動往前找最近一根有變動的收盤價對比
     last_close = float(close_v[-1])
     prev_close = float(close_v[-2]) if n >= 2 else last_close
+    if abs(last_close - prev_close) < 1e-6 and n >= 3:
+        for k_back in range(2, min(6, n)):
+            if abs(last_close - float(close_v[-1 - k_back])) >= 1e-5:
+                prev_close = float(close_v[-1 - k_back])
+                break
     chg_pct = ((last_close - prev_close) / prev_close) * 100.0 if prev_close != 0 else 0.0
 
     # 9. 市場狀態面板 (24態) 數值解讀
@@ -1229,14 +1235,12 @@ def extract_live_macro_from_news(raw_news_list):
     overrides = {}
     for _, title, _ in raw_news_list:
         t_low = title.lower()
-        # 偵測 CPI 年增率 (例如：「CPI年增率攀升至3.7%」、「CPI rises 3.7%」、「CPI年增3.7%」)
         if "cpi" in t_low or "消費者物價" in t_low:
             m = re.search(r'(?:年增率?|年升|yoy|rises?|climbs?|at|to)\s*(?:攀升至|升至|降至|達|為)?\s*([2-6]\.\d)\s*%', t_low)
             if m:
                 val = float(m.group(1))
                 if 1.5 <= val <= 6.5:
                     overrides["cpi_yoy"] = val
-        # 偵測 PPI 年增率
         if "ppi" in t_low or "生產者物價" in t_low:
             m = re.search(r'(?:年增率?|年升|yoy|rises?|climbs?|at|to)\s*(?:攀升至|升至|降至|達|為)?\s*([1-8]\.\d)\s*%', t_low)
             if m:
@@ -1259,7 +1263,7 @@ def build_8_macro_cards(fred_dict, yf_rates=None, news_overrides=None):
     bear_score = 0.0
     key_drivers = []
 
-    # (1) 美國 CPI 與核心 CPI (對齊最新 9 月 CPI 3.7% / 前值 3.4% / 月增 +0.6% / 核心 2.6%)
+    # (1) 美國 CPI 與核心 CPI
     df_cpi = fred_dict.get("CPIAUCSL", pd.DataFrame())
     df_core = fred_dict.get("CPILFESL", pd.DataFrame())
     if len(df_cpi) >= 13:
@@ -1272,13 +1276,11 @@ def build_8_macro_cards(fred_dict, yf_rates=None, news_overrides=None):
             c_yoy = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-13] - 1.0) * 100.0
             c_mom = (df_core['VAL'].iloc[-1] / df_core['VAL'].iloc[-2] - 1.0) * 100.0
             core_str = f" ｜ 核心 {c_yoy:.1f}%(月+{c_mom:.1f}%)"
-        # 若新聞剛公布最新月度數據且高於舊月份，優先採用新聞最新公布值
         if "cpi_yoy" in news_overrides and abs(news_overrides["cpi_yoy"] - yoy_now) >= 0.15:
             yoy_prev = yoy_now
             yoy_now = news_overrides["cpi_yoy"]
             raw_dt = "9月最新"
     else:
-        # 雲端被擋時：採用最新實際公布的 9 月 CPI 關鍵數據 (整體 3.7% / 前值 3.4% / 月增 +0.6% / 核心 2.6%)
         yoy_now = news_overrides.get("cpi_yoy", 3.7)
         yoy_prev = 3.4
         mom_now = 0.6
@@ -1506,7 +1508,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     非阻塞多執行緒 + 0.2秒即時跳動碼錶引擎：
     所有網路請求在背景平行執行，主執行緒每 0.2 秒刷新一次進度條與已耗時秒數，絕不定格卡死！
     """
-    cache_key = f"intel_v84_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
+    cache_key = f"intel_v85_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
     if "intel_mem_cache" not in st.session_state:
         st.session_state.intel_mem_cache = {}
 
@@ -1751,7 +1753,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     # 從最新新聞自動萃取剛公布的 CPI / PPI 數字進行校準
     news_overrides = extract_live_macro_from_news(raw_news_list)
 
-    # 組裝 8 大總經卡片 (含自動校準與 9 月 CPI 3.7% 保底基準)
+    # 組裝 8 大總經卡片
     macro_cards, bull_score, bear_score, key_drivers = build_8_macro_cards(fred_dict, yf_rates, news_overrides)
     bull_score += extra_bull
     bear_score += extra_bear
@@ -1793,7 +1795,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     hud_box.empty()
 
-    # ── 嚴格計算大盤技術結構得分，並與宏觀經濟交叉生成戰術指令 ──
+    # ── 嚴格計算大盤技術結構得分，並與宏觀經濟交叉生成戰術指令 (純正 HTML 高亮，無 ** 符號殘留) ──
     tech_bull_cnt, tech_bear_cnt = 0, 0
     k2_dip_indices, k2_top_indices = [], []
     bottom_dip_kws = ["恐慌抄底", "極度超賣", "Market Bottom", "空頭陷阱", "中樞共振 Buy", "OB共振支撐", "中樞 Buy", "OB支撐確認"]
@@ -1821,48 +1823,67 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     macro_net = bull_score - bear_score
 
-    if macro_net <= -1.5 and tech_bull_cnt >= 2:
+    # 精準分級決策：避免單一指數 (如 SOXX) 在全局 4 空 + 宏觀大逆風時過度樂觀亮綠燈
+    if macro_net <= -1.5 and tech_bear_cnt >= 3 and len(k2_dip_indices) == 1:
+        dip_str = ", ".join(k2_dip_indices)
+        tactical_mode = f"⚠️ 【主倉位防守對沖 (Hedge) ／ 僅限 {dip_str} 極小倉搶短反抽】"
+        tactical_cls = "warn"
+        tactical_detail = (
+            f"目前<b style='color:#ff5252;'>全局處於總經逆風（CPI/PPI 通膨與美債殖利率壓抑）且大盤結構為 {tech_bull_cnt} 多 {tech_bear_cnt} 空</b>，整體空方壓力高達 60% 以上！"
+            f"雖然 <b style='color:#00e676;'>{dip_str}</b> 近 2 根 K 棒獨自觸發了<b style='color:#00e5ff;'>空頭陷阱 / OB共振支撐守穩訊號</b>，但在大盤尚未全面轉多前，屬於「空頭結構中的局部破底翻反抽」。<br>"
+            f"👉 <b style='color:#ffd600;'>實戰建議</b>：主倉位務必維持高現金或配置 <b style='color:#ff8a80;'>SQQQ / 台指空單進行對沖防守</b>；若想參與 <b>{dip_str}</b>（如 SOXL / 半導體權值股）的短線技術反彈，<b style='color:#00e676;'>嚴格限制在 1～2 成極小倉位快進快出</b>，一旦跌破 OB 支撐下緣立即停損！"
+        )
+    elif len(k2_dip_indices) >= 2 and (tech_bear_cnt >= 2 or macro_net < 0):
+        dip_str = ", ".join(k2_dip_indices)
+        tactical_mode = f"⚡ 【左側分批抄底 (Buy the Dip) ／ 多指數同步支撐共振】({dip_str})"
+        tactical_cls = "bull"
+        tactical_detail = (
+            f"雖然宏觀數據仍有逆風，但大盤已有<b style='color:#00e676;'>多個核心指數（{dip_str}）同步觸發抄底或關鍵 OB/中樞支撐守穩訊號</b>，短線急跌宣洩後具備高勝率集體反抽動能！<br>"
+            f"👉 <b style='color:#ffd600;'>實戰建議</b>：可針對下方篩選出<b style='color:#00e5ff;'>「🟢恐慌抄底 / 🟣極度超賣 / 🌟中樞共振Buy / 🟪OB共振支撐」</b>的強勢權值股或槓桿 ETF（如 00631L / QLD / SOXL）<b style='color:#00e676;'>分批試單抄底</b>，並以該支撐區下緣作為嚴格防守點。"
+        )
+    elif macro_net <= -1.5 and tech_bull_cnt >= 2:
         tactical_mode = "🛡️ 【買入對沖 (Hedge) ／ 逢高減碼防守】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**宏觀經濟與資金面偏空**（如 9 月 CPI 年增率攀升至 3.7% 超預期、汽油單月大增推升通膨黏性），但**部分大盤指數仍處於多頭結構或高檔震盪**。"
-            "這種「基本面逆風 vs 技術面高檔」最容易引發突發性補跌或誘多殺盤！\n"
-            "👉 **實戰建議**：切勿在突破時追高！現有多單建議逢反彈至壓力區減碼，或配置 **SQQQ / SPXS / 台指空單 / VIX 避險部位進行對沖 (Hedge)**；若要做多僅能等待回踩「🌟中樞共振 / 🟪OB共振支撐」收腳確認。"
+            "目前<b style='color:#ff5252;'>宏觀經濟與資金面偏空</b>（如 9 月 CPI 年增率攀升至 3.7% 超預期、10Y 美債殖利率與油價走高壓抑估值），但<b style='color:#00e676;'>部分大盤指數仍處於多頭結構或高檔震盪</b>。"
+            "這種「基本面逆風 vs 技術面高檔」最容易引發突發性補跌或誘多殺盤！<br>"
+            "👉 <b style='color:#ffd600;'>實戰建議</b>：切勿在突破時追高！現有多單建議逢反彈至壓力區減碼，或配置 <b style='color:#ff8a80;'>SQQQ / SPXS / 台指空單 / VIX 避險部位進行對沖 (Hedge)</b>；若要做多僅能等待回踩「🌟中樞共振 / 🟪OB共振支撐」收腳確認。"
         )
     elif macro_net <= -1.5 and tech_bear_cnt >= 3 and len(k2_dip_indices) == 0:
         tactical_mode = "📉 【順勢做空 (Short) ／ 反彈測試壓力做空 & 買入對沖】"
         tactical_cls = "bear"
         tactical_detail = (
-            "目前**宏觀數據偏空（CPI 攀升至 3.7% 顯示通膨黏性增強、升息/高利率擔憂升溫）且四大指數多數已跌破 SMC/纏論結構轉空**，形成「總經 ＋ 技術雙重空頭共振」。\n"
-            "👉 **實戰建議**：保留高現金水位，現貨部位務必配置 **反向 ETF (如 SQQQ / 00632R) 或期貨空單對沖**；積極操作者可於反彈遇 **『🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警』順勢做空**，未出現極度超賣訊號與收腳確認前切勿盲目接刀。"
+            "目前<b style='color:#ff5252;'>宏觀數據偏空（CPI 攀升至 3.7% 顯示通膨黏性增強、美債殖利率飆升）且四大指數全數處於 SMC/纏論空頭結構</b>，形成「總經 ＋ 技術雙重空頭共振」。<br>"
+            "👉 <b style='color:#ffd600;'>實戰建議</b>：保留高現金水位，現貨部位務必配置 <b style='color:#ff8a80;'>反向 ETF (如 SQQQ / 00632R) 或期貨空單對沖</b>；積極操作者可於反彈遇 <b style='color:#00e5ff;'>「🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警」順勢做空</b>，未出現極度超賣訊號與收腳確認前切勿盲目接刀。"
         )
-    elif len(k2_dip_indices) > 0 and (tech_bear_cnt >= 2 or macro_net < 0):
-        tactical_mode = f"⚡ 【左側分批抄底 (Buy the Dip) ／ 搶反彈快進快出】({', '.join(k2_dip_indices)} 觸發支撐/抄底)"
+    elif len(k2_dip_indices) >= 1 and macro_net >= -1.5:
+        dip_str = ", ".join(k2_dip_indices)
+        tactical_mode = f"⚡ 【右側回踩低接 ／ 分批布局反彈】({dip_str} 觸發支撐)"
         tactical_cls = "bull"
         tactical_detail = (
-            f"雖然 CPI/PPI 通膨數據帶來逆風壓力，但大盤核心指數（**{', '.join(k2_dip_indices)}**）近 2 根 K 棒已觸發 **抄底或關鍵 OB/中樞支撐守穩訊號**，短線急跌宣洩後具備強勁技術面反抽動能。\n"
-            "👉 **實戰建議**：可針對下方篩選出「🟢恐慌抄底 / 🟣極度超賣 / 🌟中樞共振Buy」的強勢權值股或槓桿 ETF (如 00631L / QLD / SOXL) **分批試單抄底**，並嚴格以該支撐下緣作為停損防守點。"
+            f"目前總經環境可控，且大盤核心指數（<b style='color:#00e676;'>{dip_str}</b>）近 2 根 K 棒已觸發<b style='color:#00e5ff;'>關鍵 OB / 中樞支撐守穩或抄底訊號</b>，具備良好技術面支撐。<br>"
+            f"👉 <b style='color:#ffd600;'>實戰建議</b>：可針對下方篩選出<b style='color:#00e676;'>「🟢恐慌抄底 / 🌟中樞共振Buy / 🟪OB共振支撐」</b>的領頭羊分批低接布局，並嚴格以支撐區下緣作為停損防守點。"
         )
     elif macro_net >= 1.5 and tech_bull_cnt >= 3:
         tactical_mode = "🚀 【順勢積極做多 (Trend Long) ／ 抱牢主升段】"
         tactical_cls = "bull"
         tactical_detail = (
-            "目前**總經數據與跨市場資金順風（Risk-On）且大盤處於多頭結構**，屬於勝率最高的順風做多環境！\n"
-            "👉 **實戰建議**：多單抱牢，積極鎖定下方篩選器中觸發 **「🌟中樞共振Buy / 🟪OB共振支撐 / 🟩OB支撐確認」** 的高成交量領頭羊順勢加碼做多。"
+            "目前<b style='color:#00e676;'>總經數據與跨市場資金順風（Risk-On）且大盤處於多頭結構</b>，屬於勝率最高的順風做多環境！<br>"
+            "👉 <b style='color:#ffd600;'>實戰建議</b>：多單抱牢，積極鎖定下方篩選器中觸發 <b style='color:#00e5ff;'>「🌟中樞共振Buy / 🟪OB共振支撐 / 🟩OB支撐確認」</b> 的高成交量領頭羊順勢加碼做多。"
         )
     elif macro_net >= 0 and tech_bear_cnt >= 2:
         tactical_mode = "💎 【右側回踩做多 ／ 等待底部結構確認】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**總經與資金環境尚稱溫和，但大盤技術面正處於回檔修正洗盤階段**。\n"
-            "👉 **實戰建議**：屬於「多頭市場的技術性回調」，採取 **買黑不買紅** 策略，耐心等待個股回踩中樞或 OB 共振支撐確認守穩後，進行右側低接布局。"
+            "目前<b style='color:#00e676;'>總經與資金環境尚稱溫和</b>，但<b style='color:#ffca28;'>大盤技術面正處於回檔修正洗盤階段</b>。<br>"
+            "👉 <b style='color:#ffd600;'>實戰建議</b>：屬於「多頭市場的技術性回調」，採取 <b style='color:#00e5ff;'>買黑不買紅</b> 策略，耐心等待個股回踩中樞或 OB 共振支撐確認守穩後，進行右側低接布局。"
         )
     else:
         tactical_mode = "⚖️ 【多空雙向區間操作 ／ 重個股輕指數 (選股不選市)】"
         tactical_cls = "warn"
         tactical_detail = (
-            "目前**宏觀數據（通膨/就業/利率預期）與大盤技術結構處於多空拉鋸消化期**，指數空間有限、個股強弱分化劇烈。\n"
-            "👉 **實戰建議**：避免追高殺低！逢低在 **OB/中樞共振支撐做多**，逢高遇 **OB/中樞壓力或頂部預警獲利了結/短空對沖**，嚴控部位在 5～6 成水位。"
+            "目前<b style='color:#ffca28;'>宏觀數據（通膨/就業/利率預期）與大盤技術結構處於多空拉鋸消化期</b>，指數空間有限、個股強弱分化劇烈。<br>"
+            "👉 <b style='color:#ffd600;'>實戰建議</b>：避免追高殺低！逢低在 <b style='color:#00e676;'>OB/中樞共振支撐做多</b>，逢高遇 <b style='color:#ff5252;'>OB/中樞壓力或頂部預警獲利了結/短空對沖</b>，嚴控部位在 5～6 成水位。"
         )
 
     result_dict = {
@@ -2037,7 +2058,7 @@ if auto_intel:
         f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
         f'<span style="font-size:1.20rem;font-weight:900;color:#ffffff;">🎯 綜合戰術指令：{auto_intel["tactical_mode"]}</span>'
         f'<div>'
-        f'<span class="baro-badge badge-{t_cls}" style="margin-right:6px;">宏觀資金評分：多 {b_sc:.1f} vs 空 {s_sc:.1f}</span>'
+        f'<span class="baro-badge badge-{"bull" if b_sc >= s_sc else "bear"}" style="margin-right:6px;">宏觀資金評分：多 {b_sc:.1f} vs 空 {s_sc:.1f}</span>'
         f'<span class="baro-badge badge-{"bull" if tb_cnt > ts_cnt else ("bear" if ts_cnt > tb_cnt else "warn")}">大盤真多頭結構 ({selected_tf_label})：{tb_cnt} 多 vs {ts_cnt} 空</span>'
         f'</div></div>'
         f'<div class="gauge-wrap"><div class="gauge-bull" style="width:{bull_pct}%;"></div></div>'
@@ -2045,7 +2066,7 @@ if auto_intel:
         f'<span style="color:#00e676;font-weight:700;">🟢 多方順風能量 {bull_pct}%</span>'
         f'<span style="color:#ff5252;font-weight:700;">🔴 空方逆風壓力 {bear_pct}%</span>'
         f'</div>'
-        f'<div style="font-size:0.89rem;color:#ffffff;line-height:1.58;">{auto_intel["tactical_detail"].replace(chr(10), "<br>")}</div>'
+        f'<div style="font-size:0.89rem;color:#ffffff;line-height:1.62;">{auto_intel["tactical_detail"]}</div>'
         f'{drivers_html}'
         f'</div>'
     )
