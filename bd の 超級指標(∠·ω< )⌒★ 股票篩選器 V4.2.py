@@ -1,5 +1,6 @@
 import streamlit as st
-import streamlit.components.v1 as components  
+import streamlit.components.v1 as components
+import yfinance as yf
 import pandas as pd
 import numpy as np
 import time
@@ -26,7 +27,7 @@ warnings.filterwarnings("ignore")
 # 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化 (防擠壓 + 等高對齊 + 動態載入動畫)
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.7",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.8",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -85,8 +86,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.7")
-st.caption("機構級高對比戰情版：**零裁切舒適排版 × 5大盤像素級等高對齊 × 總經與大盤多空合算評分 × 預設180天完整纏論中樞**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.8")
+st.caption("機構級高對比戰情版：**零裁切舒適排版 × 5大盤像素級等高對齊 × 總經與大盤多空合算評分 × 一鍵複製 AI 深度分析**")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義
@@ -185,6 +186,26 @@ def render_loader_hud(placeholder, step_title, pct, elapsed_sec, eta_sec, sub_de
         f'</div>'
     )
     placeholder.markdown(html, unsafe_allow_html=True)
+
+def extract_ticker_df(data, ticker):
+    """安全提取單一標的 DataFrame (相容新舊版 yfinance MultiIndex 結構)"""
+    if data is None or len(data) == 0:
+        return pd.DataFrame()
+    try:
+        if isinstance(data.columns, pd.MultiIndex):
+            if ticker in data.columns.get_level_values(0):
+                df_sub = data[ticker].copy()
+            elif ticker in data.columns.get_level_values(1):
+                df_sub = data.xs(ticker, axis=1, level=1).copy()
+            else:
+                return pd.DataFrame()
+        else:
+            df_sub = data.copy()
+        if 'Close' in df_sub.columns:
+            return df_sub.dropna(subset=['Close'])
+    except Exception:
+        pass
+    return pd.DataFrame()
 
 # ════════════════════════════════════════════════════════════════════════════
 # 數據獲取與 TradingView 4H 時框精準重採樣
@@ -1119,9 +1140,9 @@ def translate_and_summarize_news(title):
     bear_words = [
         "hot", "hotter", "comes in hot", "accelerates", "tops forecasts", "above expectations",
         "hike", "hawkish", "inflation rises", "energy driven inflation", "inflation test",
-        "tariff", "sanction", "drop", "fall", "plunge", "miss", "fear", "recession",
-        "selloff", "sell-off", "under pressure", "slump", "deficit", "war", "ugly",
-        "jump in us inflation", "yields jump", "steepest", "shed", "losses", "rout", "tumble",
+        "largest gain", "expensive gasoline", "tariff", "sanction", "drop", "fall", "plunge",
+        "miss", "fear", "recession", "selloff", "sell-off", "under pressure", "slump", "deficit",
+        "war", "ugly", "jump in us inflation", "yields jump", "steepest", "shed", "losses", "rout", "tumble",
         "攀升", "升溫", "高於預期", "超預期", "大超預期", "遠超預期", "爆表", "大幅走高", "通膨警報",
         "黏性", "難鬆口氣", "升息", "利空", "大跌", "恐慌", "賣超", "重挫", "破底", "飆升", "暴跌", "殺盤", "承壓"
     ]
@@ -1137,7 +1158,7 @@ def translate_and_summarize_news(title):
     b_hits = sum(1 for w in bull_words if w in t_low)
     s_hits = sum(1 for w in bear_words if w in t_low)
 
-    if any(k in topic_str for k in ["CPI通膨", "PPI生產物價", "核心PCE"]) and any(w in t_low for w in ["爆表", "超預期", "高於預期", "攀升", "走高", "年升", "年增", "hot", "inflation test", "警報", "黏性"]):
+    if any(k in topic_str for k in ["CPI通膨", "PPI生產物價", "核心PCE"]) and any(w in t_low for w in ["爆表", "超預期", "高於預期", "攀升", "走高", "年升", "年增", "hot", "inflation test", "largest gain", "expensive gasoline", "警報", "黏性"]):
         s_hits += 3
 
     if s_hits > b_hits:
@@ -1504,18 +1525,21 @@ def build_8_macro_cards(fred_dict, yf_rates=None, news_overrides=None):
 
 
 def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confirm, show_swing_ob):
-    """非阻塞多執行緒 + 0.2秒即時跳動碼錶引擎"""
-    cache_key = f"intel_v87_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
+    """非阻塞多執行緒 + 防互鎖保護 + 0.2秒即時跳動碼錶引擎"""
+    cache_key = f"intel_v88_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
     if "intel_mem_cache" not in st.session_state:
         st.session_state.intel_mem_cache = {}
 
     cached_item = st.session_state.intel_mem_cache.get(cache_key)
-    if cached_item and (time.time() - cached_item["ts"] < 900) and len(cached_item["data"].get("macro_cards", [])) >= 8:
+    # 確保大盤 baro_results 至少有成功抓到資料才使用快取，避免空結果被鎖死
+    if (cached_item and (time.time() - cached_item["ts"] < 900)
+        and len(cached_item["data"].get("macro_cards", [])) >= 8
+        and any(cached_item["data"].get("baro_results", {}).values())):
         return cached_item["data"]
 
     hud_box = st.empty()
     t0 = time.time()
-    est_total = 4.5
+    est_total = 5.5
 
     fred_ids = [
         "CPIAUCSL", "CPILFESL", "PPIACO", "PCEPILFE",
@@ -1525,7 +1549,8 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     def task_cross_market():
         cross_tickers = ["^VIX", "^TNX", "^FVX", "^IRX", "DX-Y.NYB", "CL=F", "GC=F"]
         try:
-            return yf.download(cross_tickers, period="5d", interval="1d", group_by='ticker', progress=False, threads=True)
+            # 關閉 threads=False 防止與大盤下載搶奪 yfinance SQLite 鎖
+            return yf.download(cross_tickers, period="5d", interval="1d", group_by='ticker', progress=False, threads=False)
         except Exception:
             return None
 
@@ -1559,7 +1584,9 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         fetch_interval = "1h" if selected_tf == "4h" else selected_tf
         fast_days = min(int(scan_days), 59) if selected_tf == "15m" else int(scan_days)
         try:
-            return yf.download(barometer_tickers, period=f"{fast_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
+            # 錯開 0.35 秒啟動並設為 threads=False，確保 100% 避開 SQLite 鎖死
+            time.sleep(0.35)
+            return yf.download(barometer_tickers, period=f"{fast_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=False)
         except Exception:
             return None
 
@@ -1580,7 +1607,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         total_tasks = 13
         done_tasks = fred_effective_done + c_done + n_done + b_done
 
-        pct = min(95, max(8, int((done_tasks / total_tasks) * 92 + min(el * 5, 15))))
+        pct = min(95, max(8, int((done_tasks / total_tasks) * 92 + min(el * 4, 15))))
         rem_sec = max(0.2, est_total - el)
 
         if not fut_baro.done():
@@ -1597,7 +1624,8 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
             sub_detail=f"FRED 代理穿透 ({fred_done_cnt}/10) ｜ 跨市場資金 ({'✅' if c_done else '⏳'}) ｜ 財經新聞 ({'✅' if n_done else '⏳'}) ｜ 5大盤K線 ({'✅' if b_done else '⏳'})"
         )
 
-        if (done_tasks >= total_tasks) or (el >= 4.2 and b_done and c_done) or (el >= 6.5):
+        # 給大盤 K 線充足的下載時間（上限 15 秒），只要大盤與跨市場完成即可放行
+        if (done_tasks >= total_tasks) or (el >= 4.0 and b_done and c_done) or (el >= 15.0):
             break
 
         time.sleep(0.2)
@@ -1636,7 +1664,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     executor.shutdown(wait=False)
 
-    # 解析跨市場即時資金與備援利差 (標題與徽章全面精簡，防止 5 欄擠壓爆框)
+    # 解析跨市場即時資金與備援利差
     market_cards = []
     yf_rates = {}
     extra_bull, extra_bear = 0.0, 0.0
@@ -1644,17 +1672,14 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     if m_data is not None:
         def parse_m_ticker(sym):
-            try:
-                df_m = m_data[sym].dropna(subset=['Close'])
-                if len(df_m) >= 2:
-                    c_now = float(df_m['Close'].iloc[-1])
-                    c_prev = float(df_m['Close'].iloc[-2])
-                    c_5d = float(df_m['Close'].iloc[0])
-                    chg_1d = ((c_now - c_prev) / c_prev) * 100.0
-                    chg_5d = ((c_now - c_5d) / c_5d) * 100.0
-                    return c_now, chg_1d, chg_5d
-            except Exception:
-                pass
+            df_m = extract_ticker_df(m_data, sym)
+            if len(df_m) >= 2:
+                c_now = float(df_m['Close'].iloc[-1])
+                c_prev = float(df_m['Close'].iloc[-2])
+                c_5d = float(df_m['Close'].iloc[0])
+                chg_1d = ((c_now - c_prev) / c_prev) * 100.0
+                chg_5d = ((c_now - c_5d) / c_5d) * 100.0
+                return c_now, chg_1d, chg_5d
             return None
 
         tnx_info = parse_m_ticker("^TNX")
@@ -1774,16 +1799,23 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
     baro_results = {}
-    if b_data is not None:
-        for b_tick in barometer_tickers:
-            try:
-                df_b = b_data[b_tick] if len(barometer_tickers) > 1 else b_data
-                df_b = df_b.dropna(subset=['Close'])
-                if len(df_b) > 35:
-                    df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
-                    baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
-            except Exception:
+    fetch_interval = "1h" if selected_tf == "4h" else selected_tf
+    fast_days = min(int(scan_days), 59) if selected_tf == "15m" else int(scan_days)
+
+    for b_tick in barometer_tickers:
+        try:
+            df_b = extract_ticker_df(b_data, b_tick)
+            # 若批次下載漏掉單一指數，自動進行單檔補抓保底
+            if len(df_b) <= 35:
+                single_d = yf.download(b_tick, period=f"{fast_days}d", interval=fetch_interval, progress=False, threads=False)
+                df_b = extract_ticker_df(single_d, b_tick)
+            if len(df_b) > 35:
+                df_proc_b = resample_to_tv_4h(df_b, b_tick) if selected_tf == "4h" else df_b.copy()
+                baro_results[b_tick] = scan_signals(df_proc_b, recent_k=14, strict_confirm=strict_confirm, show_swing_ob=show_swing_ob)
+            else:
                 baro_results[b_tick] = None
+        except Exception:
+            baro_results[b_tick] = None
 
     hud_box.empty()
 
@@ -1897,10 +1929,11 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         "tech_bear_cnt": tech_bear_cnt
     }
 
-    st.session_state.intel_mem_cache[cache_key] = {
-        "ts": time.time(),
-        "data": result_dict
-    }
+    if any(baro_results.values()):
+        st.session_state.intel_mem_cache[cache_key] = {
+            "ts": time.time(),
+            "data": result_dict
+        }
 
     return result_dict
 
@@ -2239,7 +2272,6 @@ if auto_intel:
                         else:
                             tactical_tag, style_cls = "⚠️ 高位背離震盪 (減碼防守)", "warn"
 
-                # 去掉多餘的【】括號，並改為乾淨的「上下雙行結構」，徹底解決 3 行切字問題！
                 k2_sigs = b_res.get("K2_Signals", [])
                 k2_bull_hits = [s.split("(")[0].replace("【", "").replace("】", "") for s in k2_sigs if any(k in s for k in bottom_dip_kws)]
                 k2_bear_hits = [s.split("(")[0].replace("【", "").replace("】", "") for s in k2_sigs if any(k in s for k in top_escape_kws)]
@@ -2277,7 +2309,6 @@ if auto_intel:
                 chg_col = "#00e676" if chg_val >= 0 else "#ff5252"
                 tv_url = get_tv_link(b_tick)
 
-                # 將支撐與壓力拆解為「名稱+距離%」與「完整價格區間」，卡片上直接顯示不變 ...
                 sup_raw = b_res["最近支撐區"]
                 res_raw = b_res["最近壓力區"]
                 sup_short = re.sub(r'\[.*?\]', '', sup_raw).strip()
@@ -2309,7 +2340,6 @@ if auto_intel:
                 )
                 st.markdown(card_html, unsafe_allow_html=True)
 
-                # 將原本被擠掉的延伸資訊（完整支撐壓力區間、RSI狀態、近2K與近14K明細）整齊收納進折疊面板
                 with st.expander("🔍 完整價位區間 & 14K 訊號時間軸"):
                     st.caption(f"📊 **動能狀態：** {mom_14k_str} ｜ RSI：{b_res['RSI狀態']}")
                     st.caption(f"🛡️ **最近支撐：** {sup_raw}")
@@ -2401,8 +2431,7 @@ if scan_btn:
                 )
 
                 try:
-                    df_t = data[t] if len(batch) > 1 else data
-                    df_t = df_t.dropna(subset=['Close'])
+                    df_t = extract_ticker_df(data, t) if len(batch) > 1 else data.dropna(subset=['Close'])
                     if len(df_t) > 35:
                         successful_tickers.add(t)
                         avg_vol = calc_robust_avg_vol(df_t)
@@ -2473,12 +2502,12 @@ if scan_btn:
 # ════════════════════════════════════════════════════════════════════════════
 st.subheader("📋 個股訊號掃描清單")
 
+filtered_rows = []
 if "scan_cache" in st.session_state:
     cache = st.session_state.scan_cache
     all_scanned_rows = cache["all_scanned_rows"]
 
     use_fund = not scan_mode.startswith("1")
-    filtered_rows = []
 
     for r in all_scanned_rows:
         if scan_mode.startswith("1"):
@@ -2561,7 +2590,7 @@ if "scan_cache" in st.session_state:
     else:
         st.warning("🎯 目前沒有標的同時符合「觸發條件」與「訊號過濾器」。可直接在左側切換戰術濾網或把近 N 根 K 線調大。")
 else:
-    st.info("👆 上方 **宏觀經濟** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
+    st.info("👆 上方 **宏觀經濟與大盤 24 態** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 🤖 第三部分：一鍵複製爬蟲資訊請 AI 專業分析 (Prompt 自動打包 + 一鍵剪貼簿)
@@ -2569,7 +2598,7 @@ else:
 st.markdown("---")
 st.subheader("🤖 一鍵複製戰情數據請 AI 專業分析")
 
-def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k):
+def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows):
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     clean_html = lambda txt: re.sub(r'<[^>]+>', '', str(txt)) if txt else ""
     
@@ -2629,9 +2658,9 @@ def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k):
             lines.append("")
 
     lines.append(f"## 六、【個股訊號掃描結果 ({tf_lbl})】")
-    if "scan_cache" in st.session_state and "filtered_rows" in locals() and filtered_rows:
+    if current_filtered_rows:
         vol_col_key = "日均交易量" if vol_sort_by.startswith("日均") else "當前成交量"
-        sorted_scan = sorted(filtered_rows, key=lambda x: (x.get("Priority", 0), x.get(vol_col_key, 0)), reverse=True)
+        sorted_scan = sorted(current_filtered_rows, key=lambda x: (x.get("Priority", 0), x.get(vol_col_key, 0)), reverse=True)
         lines.append(f"本次共篩選出 {len(sorted_scan)} 檔符合條件之標的（以下列出前 35 檔核心標的）：")
         for r in sorted_scan[:35]:
             fund_str = f"｜PEG:{r['PEG (市賺率)']} P/E:{r['P/E']} P/B:{r['P/B']}" if not scan_mode.startswith("1") else ""
@@ -2652,7 +2681,7 @@ def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k):
     ])
     return "\n".join(lines)
 
-ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k)
+ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k, filtered_rows)
 b64_prompt = json.dumps(ai_prompt_text)
 
 col_ai_btn, col_ai_Exp = st.columns([1, 2])
@@ -2688,3 +2717,8 @@ with col_ai_btn:
         """,
         height=58
     )
+
+with col_ai_Exp:
+    with st.expander("📄 檢視 / 手動複製 AI 專業分析提示詞 (Prompt 預覽)", expanded=False):
+        st.caption("💡 若手機或瀏覽器權限阻擋一鍵按鈕，可直接點擊下方黑框右上角的「複製圖示」：")
+        st.code(ai_prompt_text, language="markdown")
