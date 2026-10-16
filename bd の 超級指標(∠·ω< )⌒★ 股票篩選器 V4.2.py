@@ -2688,8 +2688,3 @@ with col_ai_btn:
         """,
         height=58
     )
-
-with col_ai_Exp:
-    with st.expander("📄 檢視 / 手動複製 AI 專業分析提示詞 (Prompt 預覽)", expanded=False):
-        st.caption("💡 若手機或瀏覽器權限阻擋一鍵按鈕，可直接點擊下方黑框右上角的「複製圖示」：")
-        st.code(ai_prompt_text, language="markdown")
