@@ -1,5 +1,5 @@
 import streamlit as st
-import yfinance as yf
+import streamlit.components.v1 as components  
 import pandas as pd
 import numpy as np
 import time
@@ -2563,65 +2563,133 @@ if "scan_cache" in st.session_state:
 else:
     st.info("👆 上方 **宏觀經濟** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
 
-# ── 🤖 AI 戰情室全自動攔截器 (同時抓取：總經數據 + 大盤狀態 + 個股表格) ──
-with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給 Ai)", expanded=True):
-    import re
-    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n"
-    ai_report += "=" * 50 + "\n"
+# ════════════════════════════════════════════════════════════════════════════
+# 🤖 第三部分：一鍵複製爬蟲資訊請 AI 專業分析 (Prompt 自動打包 + 一鍵剪貼簿)
+# ════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("🤖 一鍵複製戰情數據請 AI 專業分析")
+
+def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k):
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    clean_html = lambda txt: re.sub(r'<[^>]+>', '', str(txt)) if txt else ""
     
-    # 1. 自動攔截所有「總經、大盤、VIX、殖利率、計分」相關字典與文字變數
-    captured_macro = []
-    ignore_keys = {'st', 'pd', 'np', 'yf', 're', 'os', 'sys', 'time', 'datetime', 'ALL_SIG_TYPES', 'PRESET_FILTERS'}
-    
-    for k, v in list(locals().items()):
-        if k.startswith('_') or k in ignore_keys or callable(v):
-            continue
-        # 攔截字典 (例如 macro_data, market_status, bench_res 等)
-        if isinstance(v, dict) and 0 < len(v) <= 50:
-            # 過濾掉純設定檔，只抓含有數值或狀態的結果字典
-            captured_macro.append(f"📌 [{k}]: {v}")
-        # 攔截列表 (例如大盤卡片列表、計分結果列表)
-        elif isinstance(v, list) and 0 < len(v) <= 30 and isinstance(v[0], (dict, str, tuple)):
-            if not (isinstance(v[0], str) and len(v) > 15 and len(v[0]) < 15): # 排除單純的股票代碼清單
-                captured_macro.append(f"📌 [{k}]: {v}")
-        # 攔截渲染成 HTML 卡片的總經/大盤字串 (自動剝除 HTML 標籤留純文字)
-        elif isinstance(v, str) and len(v) > 30 and ('<div' in v or 'VIX' in v or 'BOS' in v or 'CHOCH' in v or '總經' in v or '殖利率' in v):
-            clean_txt = re.sub(r'<[^>]+>', ' ', v)
-            clean_txt = re.sub(r'\s+', ' ', clean_txt).strip()
-            if len(clean_txt) > 10:
-                captured_macro.append(f"📌 [{k}]: {clean_txt[:800]}")
+    lines = [
+        "你現在是一位華爾街機構級量化交易員、宏觀經濟分析師與技術分析專家（精通纏論中樞、Smart Money Concepts (SMC) 訂單塊 OB、WaveTrend 與多週期 RSI 共振策略）。",
+        f"以下是我透過量化爬蟲系統在【{now_str}】抓取到的最新跨市場總經數據、大盤 24 態結構以及個股訊號掃描結果（掃描時框：{tf_lbl}｜訊號回溯：近 {rec_k} 根 K 棒）。",
+        "請根據這些客觀數據，為我進行深度、專業且具體的實戰交易分析：\n"
+    ]
 
-    if captured_macro:
-        ai_report += "【一、大盤與總經爬蟲數據】\n" + "\n".join(captured_macro) + "\n\n"
+    if intel_data:
+        b_sc = intel_data.get("bull_score", 0)
+        s_sc = intel_data.get("bear_score", 0)
+        tb_cnt = intel_data.get("tech_bull_cnt", 0)
+        ts_cnt = intel_data.get("tech_bear_cnt", 0)
+        lines.append("## 一、【全局多空評分與戰術決策】")
+        lines.append(f"- 系統綜合戰術指令：{clean_html(intel_data.get('tactical_mode', ''))}")
+        lines.append(f"- 全局綜合評分（總經+大盤）：多方 {b_sc:.1f} 分 vs 空方 {s_sc:.1f} 分")
+        lines.append(f"- 四大核心指數真多頭結構數：{tb_cnt} 多 vs {ts_cnt} 空")
+        lines.append(f"- 系統初步診斷：{clean_html(intel_data.get('tactical_detail', ''))}")
+        if intel_data.get("key_drivers"):
+            lines.append("- 核心總經與市場驅動因子：")
+            for d in intel_data["key_drivers"]:
+                lines.append(f"  * {clean_html(d)}")
+        lines.append("")
+
+        if intel_data.get("market_cards"):
+            lines.append("## 二、【跨市場即時資金流向】")
+            for mk in intel_data["market_cards"]:
+                lines.append(f"- {mk['title']}：{mk['price']} (單日 {mk['chg']:+.2f}%) ｜ {mk['badge']} ｜ {mk['sub']}")
+            lines.append("")
+
+        if intel_data.get("macro_cards"):
+            lines.append("## 三、【聯準會 FRED 8大核心總經指標】")
+            for mc in intel_data["macro_cards"]:
+                lines.append(f"- {mc['title']}：{mc['main']} ｜ {mc['badge']} ｜ {mc['sub']}")
+            lines.append("")
+
+        if intel_data.get("baro_results"):
+            lines.append(f"## 四、【5 大盤指數 24 態結構與支撐壓力 ({tf_lbl})】")
+            for b_tick, b_res in intel_data["baro_results"].items():
+                if b_res:
+                    k2_str = "、".join(b_res.get("K2_Signals", [])) if b_res.get("K2_Signals") else "無"
+                    sig_14k = b_res.get("觸發指標通知") or "無"
+                    lines.append(
+                        f"- **{b_tick}**｜收盤價：{b_res['最新收盤價']:.2f} ({b_res['漲跌幅']:+.2f}%)｜"
+                        f"結構：【{b_res['SMC_Tag_UI']} + {b_res['Chan_Tag']}】({b_res['Chan_Action_Base']})｜"
+                        f"WT快線：{b_res['WT快線']:.1f}｜平均RSI：{b_res['平均RSI']:.1f} ({b_res['RSI狀態']})｜"
+                        f"最近支撐：{b_res['最近支撐區']}｜最近壓力：{b_res['最近壓力區']}｜"
+                        f"近2K閃電訊號：{k2_str}｜近14K累積訊號：{sig_14k}"
+                    )
+            lines.append("")
+
+        if intel_data.get("news_items"):
+            lines.append("## 五、【最新重大財經新聞與情緒判讀】")
+            for n_item in intel_data["news_items"]:
+                lines.append(f"- [{n_item['sentiment']} | {n_item['topic']}] {n_item['title']} (解讀：{n_item['impact']})")
+            lines.append("")
+
+    lines.append(f"## 六、【個股訊號掃描結果 ({tf_lbl})】")
+    if "scan_cache" in st.session_state and "filtered_rows" in locals() and filtered_rows:
+        vol_col_key = "日均交易量" if vol_sort_by.startswith("日均") else "當前成交量"
+        sorted_scan = sorted(filtered_rows, key=lambda x: (x.get("Priority", 0), x.get(vol_col_key, 0)), reverse=True)
+        lines.append(f"本次共篩選出 {len(sorted_scan)} 檔符合條件之標的（以下列出前 35 檔核心標的）：")
+        for r in sorted_scan[:35]:
+            fund_str = f"｜PEG:{r['PEG (市賺率)']} P/E:{r['P/E']} P/B:{r['P/B']}" if not scan_mode.startswith("1") else ""
+            lines.append(
+                f"- **{r['標的代號']}**｜收盤：{r['最新收盤價']}｜SMC：{r['SMC 結構']}｜"
+                f"觸發訊號：{r['觸發指標通知']}｜支撐：{r['最近支撐區']}｜壓力：{r['最近壓力區']}{fund_str}"
+            )
     else:
-        ai_report += "【一、大盤與總經爬蟲數據】(若為空代表包在函數內，請直接在網頁按 Ctrl+A 全選複製畫面文字)\n\n"
+        lines.append("- （尚未執行個股清單掃描，或當前過濾條件下無符合個股，請先針對上方總經與大盤指數進行深度分析）")
 
-    # 2. 自動攔截所有 DataFrame 表格 (包含大盤表與個股訊號表)
-    dfs_found = []
-    for k, v in list(locals().items()):
-        if not k.startswith('_') and isinstance(v, pd.DataFrame) and not v.empty and len(v.columns) >= 3:
-            # 排除原始 K 線歷史資料 (通常有 Open/High/Low/Close 且超過 100 行)
-            cols_lower = [str(c).lower() for c in v.columns]
-            if not ('open' in cols_lower and 'high' in cols_lower and len(v) > 80):
-                dfs_found.append((k, v))
+    lines.extend([
+        "\n---",
+        "## 🎯 請根據上述數據，依序回答我以下 4 個核心問題：",
+        "1. **【宏觀與大盤多空定調】**：綜合 CPI/PPI/非農/殖利率/VIX 與 5 大盤（QQQ, SOXX, SPY, ^TWII, BTC）的纏論中樞與 SMC 結構，目前市場處於什麼階段？是否存在「總經與技術面背離」或「空頭陷阱 / 誘多風險」？",
+        "2. **【指數關鍵點位與劇本推演】**：針對美股（QQQ/SOXX/SPY）與台股（^TWII），未來 1~3 個交易日的關鍵多空分水嶺（OB 支撐與壓力區）在哪裡？站穩或跌破該如何應對？",
+        "3. **【精選個股/ETF Top 3 實戰雷達】**：若上方有掃描出個股清單，請挑出 **最值得做多的 Top 3 標的**（右側共振回踩或左側恐慌抄底）與 **最該避開/做空的標的**，並給出具體的「進場區間、停損防守價位（跌破哪個 OB 下緣）、停利目標價（哪個壓力區）」。",
+        "4. **【資金水位與部位對沖建議】**：在當前的多空評分下，建議總資金水位控制在幾成？現貨或槓桿部位（如 00631L / QLD / SOXL）是否需要搭配反向 ETF 或期貨空單進行 Hedge 對沖？"
+    ])
+    return "\n".join(lines)
 
-    if dfs_found:
-        ai_report += "【二、掃描結果表格】\n"
-        for name, df_item in dfs_found:
-            ai_report += f"▼ 表格變數 [{name}] (共 {len(df_item)} 筆):\n"
-            ai_report += df_item.to_csv(sep='|', index=False) + "\n"
-    else:
-        ai_report += "【二、掃描結果表格】目前尚無符合條件的個股表格輸出\n"
+ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k)
+b64_prompt = json.dumps(ai_prompt_text)
 
-    st.code(ai_report, language="text")
+col_ai_btn, col_ai_Exp = st.columns([1, 2])
+with col_ai_btn:
+    components.html(
+        f"""
+        <div style="display:flex;align-items:center;">
+            <button id="copy-ai-btn" style="
+                width:100%; height:46px;
+                background: linear-gradient(90deg, #00e5ff, #00e676);
+                color: #0d1117; font-weight: 900; font-size: 0.96rem;
+                border: none; border-radius: 10px; cursor: pointer;
+                box-shadow: 0 4px 15px rgba(0, 229, 255, 0.35);
+                transition: all 0.2s ease; font-family: sans-serif;
+            ">📋 一鍵複製全部爬蟲數據 & AI 分析指令</button>
+        </div>
+        <script>
+        const btn = document.getElementById('copy-ai-btn');
+        const textToCopy = {b64_prompt};
+        btn.addEventListener('click', () => {{
+            navigator.clipboard.writeText(textToCopy).then(() => {{
+                btn.innerHTML = '✅ 已成功複製到剪貼簿！快去貼給 AI 吧！';
+                btn.style.background = 'linear-gradient(90deg, #ffd600, #00e676)';
+                setTimeout(() => {{
+                    btn.innerHTML = '📋 一鍵複製全部爬蟲數據 & AI 分析指令';
+                    btn.style.background = 'linear-gradient(90deg, #00e5ff, #00e676)';
+                }}, 3000);
+            }}).catch(err => {{
+                btn.innerHTML = '⚠️ 瀏覽器阻擋，請展開右側方框點擊右上角複製';
+            }});
+        }});
+        </script>
+        """,
+        height=58
+    )
 
-#===========================
-print("\n" + "="*60)
-print("""# [AI_PROMPT_READY] 量化戰術分析指令
-請根據上方最新的量化掃描數據與總經指標，為我進行深度結構拆解與實戰配置模擬：
-1. **總經與跨市場資金歸因**：結合 CPI/PPI、美債殖利率、原油與 VIX，判斷當前屬於估值修正還是衰退交易。
-2. **五大風向球檢視**：以表格整理 QQQ, SOXX, SPY, ^TWII, BTC-USD 的 SMC 結構、纏論買賣點與關鍵支撐壓力距離。
-3. **技術訊號分類戰術**：將觸發訊號的標的依「OB/中樞支撐確認」、「極度超賣/空頭陷阱」、「頂部預警/壓力受阻」分類並給出具體防守點位。
-4. **量化距離與盈虧比驗證**：針對具備支撐保護的標的，計算當前價格與支撐下緣的風險距離 |P - S| / P 與理論盈虧比 (R/R Ratio)。
-5. **實戰資金配置與互動模擬**：給出建議倉位佔比、進出場區間與嚴格停損條件，並優先提供可互動的模擬器或視覺化圖表。""")
-print("="*60)
+with col_ai_Exp:
+    with st.expander("📄 檢視 / 手動複製 AI 專業分析提示詞 (Prompt 預覽)", expanded=False):
+        st.caption("💡 若手機或瀏覽器權限阻擋一鍵按鈕，可直接點擊下方黑框右上角的「複製圖示」：")
+        st.code(ai_prompt_text, language="markdown")
