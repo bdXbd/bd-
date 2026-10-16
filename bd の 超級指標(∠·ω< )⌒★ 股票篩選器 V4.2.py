@@ -2688,41 +2688,44 @@ def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows):
 ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k, filtered_rows)
 b64_prompt = json.dumps(ai_prompt_text)
 
-col_ai_btn, col_ai_Exp = st.columns([1, 2])
-with col_ai_btn:
-    components.html(
-        f"""
-        <div style="display:flex;align-items:center;">
-            <button id="copy-ai-btn" style="
-                width:100%; height:46px;
-                background: linear-gradient(90deg, #00e5ff, #00e676);
-                color: #0d1117; font-weight: 900; font-size: 0.96rem;
-                border: none; border-radius: 10px; cursor: pointer;
-                box-shadow: 0 4px 15px rgba(0, 229, 255, 0.35);
-                transition: all 0.2s ease; font-family: sans-serif;
-            ">📋 一鍵複製全部爬蟲數據 & AI 分析指令</button>
-        </div>
-        <script>
-        const btn = document.getElementById('copy-ai-btn');
-        const textToCopy = {b64_prompt};
-        btn.addEventListener('click', () => {{
-            navigator.clipboard.writeText(textToCopy).then(() => {{
-                btn.innerHTML = '✅ 已成功複製到剪貼簿！快去貼給 AI 吧！';
-                btn.style.background = 'linear-gradient(90deg, #ffd600, #00e676)';
-                setTimeout(() => {{
-                    btn.innerHTML = '📋 一鍵複製全部爬蟲數據 & AI 分析指令';
-                    btn.style.background = 'linear-gradient(90deg, #00e5ff, #00e676)';
-                }}, 3000);
-            }}).catch(err => {{
-                btn.innerHTML = '⚠️ 瀏覽器阻擋，請展開右側方框點擊右上角複製';
-            }});
+# 上方：100% 全寬無邊距一鍵複製按鈕（消除 iframe 預設白邊，與下方折疊盒像素級切齊）
+components.html(
+    f"""
+    <style>
+        body {{ margin: 0 !important; padding: 0 !important; overflow: hidden; background: transparent; }}
+    </style>
+    <div style="display:flex;align-items:center;width:100%;">
+        <button id="copy-ai-btn" style="
+            width:100%; height:46px;
+            background: linear-gradient(90deg, #00e5ff, #00e676);
+            color: #0d1117; font-weight: 900; font-size: 0.98rem;
+            border: none; border-radius: 8px; cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 229, 255, 0.28);
+            transition: all 0.2s ease; font-family: sans-serif;
+            box-sizing: border-box;
+        ">📋 一鍵複製全部爬蟲數據 & AI 分析指令</button>
+    </div>
+    <script>
+    const btn = document.getElementById('copy-ai-btn');
+    const textToCopy = {b64_prompt};
+    btn.addEventListener('click', () => {{
+        navigator.clipboard.writeText(textToCopy).then(() => {{
+            btn.innerHTML = '✅ 已成功複製到剪貼簿！快去貼給 AI 吧！';
+            btn.style.background = 'linear-gradient(90deg, #ffd600, #00e676)';
+            setTimeout(() => {{
+                btn.innerHTML = '📋 一鍵複製全部爬蟲數據 & AI 分析指令';
+                btn.style.background = 'linear-gradient(90deg, #00e5ff, #00e676)';
+            }}, 3000);
+        }}).catch(err => {{
+            btn.innerHTML = '⚠️ 瀏覽器阻擋，請展開下方方框點擊右上角複製';
         }});
-        </script>
-        """,
-        height=58
-    )
+    }});
+    </script>
+    """,
+    height=50
+)
 
-with col_ai_Exp:
-    with st.expander("📄 檢視 / 手動複製 AI 專業分析提示詞 (Prompt 預覽)", expanded=False):
-        st.caption("💡 若手機或瀏覽器權限阻擋一鍵按鈕，可直接點擊下方黑框右上角的「複製圖示」：")
-        st.code(ai_prompt_text, language="markdown")
+# 下方：100% 全寬折疊預覽框（放到下一行，左右邊界與上方按鈕完全對齊）
+with st.expander("📄 檢視 / 手動複製 AI 專業分析提示詞 (Prompt 預覽)", expanded=False):
+    st.caption("💡 若手機或瀏覽器權限阻擋一鍵按鈕，可直接點擊下方黑框右上角的「複製圖示」：")
+    st.code(ai_prompt_text, language="markdown")
