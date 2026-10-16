@@ -1829,7 +1829,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         tactical_mode = f"⚠️ 【主倉位防守對沖 (Hedge) ／ 僅限 {dip_str} 極小倉搶短反抽】"
         tactical_cls = "warn"
         tactical_detail = (
-            f"目前<b style='color:#ff5252;'>全局處於總經逆風（CPI/PPI 通膨與美債殖利率壓抑）且大盤結構為 {tech_bull_cnt} 多 {tech_bear_cnt} 空</b>，整體空方壓力高達 60% 以上！"
+            f"目前<b style='color:#ff5252;'>全局處於總經逆風（CPI/PPI 通膨與美債殖利率壓抑）且大盤結構為 {tech_bull_cnt} 多 {tech_bear_cnt} 空</b>，整體空方逆風壓力達 {int(round((bear_score / max(0.1, bull_score + bear_score)) * 100))}%！"
             f"雖然 <b style='color:#00e676;'>{dip_str}</b> 近 2 根 K 棒獨自觸發了<b style='color:#00e5ff;'>空頭陷阱 / OB共振支撐守穩訊號</b>，但在大盤尚未全面轉多前，屬於「空頭結構中的局部破底翻反抽」。<br>"
             f"👉 <b style='color:#ffd600;'>實戰建議</b>：主倉位務必維持高現金或配置 <b style='color:#ff8a80;'>SQQQ / 台指空單進行對沖防守</b>；若想參與 <b>{dip_str}</b>（如 SOXL / 半導體權值股）的短線技術反彈，<b style='color:#00e676;'>嚴格限制在 1～2 成極小倉位快進快出</b>，一旦跌破 OB 支撐下緣立即停損！"
         )
