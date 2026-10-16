@@ -2563,29 +2563,54 @@ if "scan_cache" in st.session_state:
 else:
     st.info("👆 上方 **宏觀經濟** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
 
-# ── 🤖 AI 戰情室一鍵複製區塊 (自動偵測 DataFrame 變數，絕不報 NameError) ──
-with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給 AI)", expanded=True):
-    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+# ── 🤖 AI 戰情室全自動攔截器 (同時抓取：總經數據 + 大盤狀態 + 個股表格) ──
+with st.expander("🤖 產生 AI 戰情室分析報告 (點右上角複製貼給 Ai)", expanded=True):
+    import re
+    ai_report = f"【爬蟲時間】{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n"
+    ai_report += "=" * 50 + "\n"
     
-    # 自動從記憶體中尋找最後產生的個股掃描結果 DataFrame
-    target_df = None
-    for var_name in ['df_res', 'res_df', 'df_show', 'display_df', 'df_filtered', 'df_final', 'df_out', 'df']:
-        if var_name in locals() and isinstance(locals()[var_name], pd.DataFrame) and len(locals()[var_name].columns) >= 4:
-            target_df = locals()[var_name]
-            break
-            
-    # 若上述常見名稱都沒命中，自動抓取當前頁面最後一個大於 4 欄的 DataFrame
-    if target_df is None:
-        for k, v in list(locals().items())[::-1]:
-            if isinstance(v, pd.DataFrame) and len(v.columns) >= 4 and not k.startswith('_'):
-                target_df = v
-                break
+    # 1. 自動攔截所有「總經、大盤、VIX、殖利率、計分」相關字典與文字變數
+    captured_macro = []
+    ignore_keys = {'st', 'pd', 'np', 'yf', 're', 'os', 'sys', 'time', 'datetime', 'ALL_SIG_TYPES', 'PRESET_FILTERS'}
+    
+    for k, v in list(locals().items()):
+        if k.startswith('_') or k in ignore_keys or callable(v):
+            continue
+        # 攔截字典 (例如 macro_data, market_status, bench_res 等)
+        if isinstance(v, dict) and 0 < len(v) <= 50:
+            # 過濾掉純設定檔，只抓含有數值或狀態的結果字典
+            captured_macro.append(f"📌 [{k}]: {v}")
+        # 攔截列表 (例如大盤卡片列表、計分結果列表)
+        elif isinstance(v, list) and 0 < len(v) <= 30 and isinstance(v[0], (dict, str, tuple)):
+            if not (isinstance(v[0], str) and len(v) > 15 and len(v[0]) < 15): # 排除單純的股票代碼清單
+                captured_macro.append(f"📌 [{k}]: {v}")
+        # 攔截渲染成 HTML 卡片的總經/大盤字串 (自動剝除 HTML 標籤留純文字)
+        elif isinstance(v, str) and len(v) > 30 and ('<div' in v or 'VIX' in v or 'BOS' in v or 'CHOCH' in v or '總經' in v or '殖利率' in v):
+            clean_txt = re.sub(r'<[^>]+>', ' ', v)
+            clean_txt = re.sub(r'\s+', ' ', clean_txt).strip()
+            if len(clean_txt) > 10:
+                captured_macro.append(f"📌 [{k}]: {clean_txt[:800]}")
 
-    if target_df is not None and not target_df.empty:
-        ai_report += f"【個股與 ETF 訊號掃描結果（共 {len(target_df)} 檔）】\n"
-        # 使用 to_csv(sep='|') 取代 to_markdown()，免除 Streamlit Cloud 缺少 tabulate 套件的報錯風險
-        ai_report += target_df.to_csv(sep='|', index=False)
+    if captured_macro:
+        ai_report += "【一、大盤與總經爬蟲數據】\n" + "\n".join(captured_macro) + "\n\n"
     else:
-        ai_report += "⚠️ 尚未偵測到掃描結果表格（請先點擊上方執行掃描，或確認此段代碼貼在 st.dataframe 顯示表格的同一層縮排下方）。"
-        
+        ai_report += "【一、大盤與總經爬蟲數據】(若為空代表包在函數內，請直接在網頁按 Ctrl+A 全選複製畫面文字)\n\n"
+
+    # 2. 自動攔截所有 DataFrame 表格 (包含大盤表與個股訊號表)
+    dfs_found = []
+    for k, v in list(locals().items()):
+        if not k.startswith('_') and isinstance(v, pd.DataFrame) and not v.empty and len(v.columns) >= 3:
+            # 排除原始 K 線歷史資料 (通常有 Open/High/Low/Close 且超過 100 行)
+            cols_lower = [str(c).lower() for c in v.columns]
+            if not ('open' in cols_lower and 'high' in cols_lower and len(v) > 80):
+                dfs_found.append((k, v))
+
+    if dfs_found:
+        ai_report += "【二、掃描結果表格】\n"
+        for name, df_item in dfs_found:
+            ai_report += f"▼ 表格變數 [{name}] (共 {len(df_item)} 筆):\n"
+            ai_report += df_item.to_csv(sep='|', index=False) + "\n"
+    else:
+        ai_report += "【二、掃描結果表格】目前尚無符合條件的個股表格輸出\n"
+
     st.code(ai_report, language="text")
