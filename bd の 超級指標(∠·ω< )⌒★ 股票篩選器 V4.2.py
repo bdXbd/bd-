@@ -989,11 +989,15 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
 
     last_close = float(close_v[-1])
     prev_close = float(close_v[-2]) if n >= 2 else last_close
-    if abs(last_close - prev_close) < 1e-6 and n >= 3:
-        for k_back in range(2, min(6, n)):
-            if abs(last_close - float(close_v[-1 - k_back])) >= 1e-5:
-                prev_close = float(close_v[-1 - k_back])
-                break
+    try:
+        # 自動尋找「前一個交易日」最後一根 K 棒的收盤價，確保 15m/1h/4h 都能顯示真實當日漲跌幅！
+        idx_dates = pd.to_datetime(df.index).date
+        last_date = idx_dates[-1]
+        prev_day_indices = np.where(idx_dates < last_date)[0]
+        if len(prev_day_indices) > 0:
+            prev_close = float(close_v[prev_day_indices[-1]])
+    except Exception:
+        pass
     chg_pct = ((last_close - prev_close) / prev_close) * 100.0 if prev_close != 0 else 0.0
 
     # 9. 市場狀態面板 (24態) 數值解讀
