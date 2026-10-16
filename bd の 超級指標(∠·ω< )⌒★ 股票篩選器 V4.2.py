@@ -24,10 +24,10 @@ except ImportError:
 warnings.filterwarnings("ignore")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁基本設定與 Glassmorphism 機構級自訂 CSS 美化 (防擠壓 + 等高對齊 + 動態載入動畫)
+# 網頁基本設定與 Glassmorphism 2.0 機構級自訂 CSS 美化
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.8",
+    page_title="bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.9",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -35,28 +35,36 @@ st.set_page_config(
 
 st.markdown(
     "<style>"
-    ".block-container { padding-top: 1.5rem; padding-bottom: 2rem; }"
-    # 基礎卡片：改為 flex-start 緊湊排列，徹底消滅中間黑洞！
-    ".baro-card { background: linear-gradient(145deg, #1a1e29, #10131a); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 13px; margin-bottom: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.28); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }"
-    ".baro-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.25); }"
-    ".baro-card-eq { height: 348px !important; overflow: hidden; }"
+    # 全域捲軸與容器微調
+    "::-webkit-scrollbar { width: 7px; height: 7px; }"
+    "::-webkit-scrollbar-track { background: #0d1117; }"
+    "::-webkit-scrollbar-thumb { background: #262c3a; border-radius: 4px; }"
+    "::-webkit-scrollbar-thumb:hover { background: #00e5ff; }"
+    ".block-container { padding-top: 1.3rem; padding-bottom: 2.2rem; }"
+    # 頂部狀態膠囊
+    ".top-status-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; padding: 8px 14px; margin-bottom: 14px; font-size: 0.80rem; color: #b0b8c8; }"
+    ".status-pill { background: rgba(0,229,255,0.12); border: 1px solid rgba(0,229,255,0.3); color: #00e5ff; padding: 2px 9px; border-radius: 99px; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }"
+    # 基礎卡片：flex-start 緊湊排列 + 頂部微光邊框
+    ".baro-card { background: linear-gradient(145deg, #1a1e29, #10131a); border: 1px solid rgba(255,255,255,0.12); border-top: 1px solid rgba(255,255,255,0.20); border-radius: 12px; padding: 12px 13px; margin-bottom: 8px; box-shadow: 0 4px 18px rgba(0,0,0,0.32); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }"
+    ".baro-card:hover { transform: translateY(-3px); box-shadow: 0 8px 26px rgba(0,229,255,0.15); border-color: rgba(0,229,255,0.35); }"
+    ".baro-card-eq { height: 356px !important; overflow: hidden; }"
     ".macro-card-sm { height: 132px !important; justify-content: space-between !important; overflow: hidden; }"
-    ".baro-bull { border-left: 5px solid #00e676; }"
-    ".baro-bear { border-left: 5px solid #ff5252; }"
-    ".baro-warn { border-left: 5px solid #ffca28; }"
+    ".baro-bull { border-left: 5px solid #00e676 !important; }"
+    ".baro-bear { border-left: 5px solid #ff5252 !important; }"
+    ".baro-warn { border-left: 5px solid #ffca28 !important; }"
     # 頂部標題與價格
     ".baro-title { font-size: 0.92rem; font-weight: 800; color: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 4px; }"
     ".ticker-wrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }"
     ".price-wrap { text-align: right; white-space: nowrap; line-height: 1.18; flex-shrink: 0; }"
     ".baro-price { font-size: 0.88rem; font-family: 'JetBrains Mono', monospace; color: #00e5ff; font-weight: 700; }"
-    ".tv-mini-btn { font-size: 0.68rem; background: rgba(0,229,255,0.15); color: #00e5ff !important; padding: 1px 5px; border-radius: 4px; text-decoration: none !important; border: 1px solid rgba(0,229,255,0.35); margin-left: 5px; white-space: nowrap; }"
-    ".tv-mini-btn:hover { background: rgba(0,229,255,0.32); }"
-    # 近 2K 閃電雷達槽位 (允許自然換行不切字)
+    ".tv-mini-btn { font-size: 0.68rem; background: rgba(0,229,255,0.15); color: #00e5ff !important; padding: 1px 5px; border-radius: 4px; text-decoration: none !important; border: 1px solid rgba(0,229,255,0.35); margin-left: 5px; white-space: nowrap; transition: all 0.15s ease; }"
+    ".tv-mini-btn:hover { background: rgba(0,229,255,0.35); transform: scale(1.05); }"
+    # 近 2K 閃電雷達槽位
     ".k2-slot { height: 48px; border-radius: 6px; padding: 4px 8px; margin-bottom: 6px; font-size: 0.72rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; line-height: 1.28; overflow: hidden; box-sizing: border-box; }"
     ".k2-bull { background: rgba(0,230,118,0.18); border: 1px solid #00e676; color: #00e676; }"
     ".k2-bear { background: rgba(255,82,82,0.18); border: 1px solid #ff5252; color: #ff5252; }"
     ".k2-idle { background: rgba(255,255,255,0.035); border: 1px dashed rgba(255,255,255,0.15); color: #788296; font-weight: 600; }"
-    # 24 態標籤與劇本區 (緊湊無黑洞)
+    # 24 態標籤與劇本區
     ".baro-badge { display: flex; flex-direction: column; justify-content: center; height: 42px; padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.2px; line-height: 1.30; box-sizing: border-box; overflow: hidden; }"
     ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.45); }"
     ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.45); }"
@@ -65,14 +73,14 @@ st.markdown(
     ".baro-advice { font-size: 0.80rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; min-height: 22px; line-height: 1.30; }"
     ".baro-sub { font-size: 0.73rem; color: #b0b8c8; line-height: 1.45; border-top: 1px solid rgba(255,255,255,0.10); padding-top: 7px; margin-top: 2px; }"
     ".sub-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }"
-    ".zone-box { background: rgba(255,255,255,0.04); border-radius: 5px; padding: 4px 7px; margin-top: 4px; font-size: 0.71rem; line-height: 1.38; border-left: 2px solid rgba(0,229,255,0.5); }"
+    ".zone-box { background: rgba(255,255,255,0.04); border-radius: 5px; padding: 4px 7px; margin-top: 4px; font-size: 0.70rem; line-height: 1.38; border-left: 2px solid rgba(0,229,255,0.5); }"
     ".metric-pill { background: rgba(255,214,0,0.15); border: 1px solid rgba(255,214,0,0.35); padding: 0px 5px; border-radius: 4px; font-family: monospace; color: #ffd600; font-weight: 700; }"
     ".strategy-box { background: linear-gradient(135deg, #131824, #1c2434); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); color: #ffffff; }"
-    ".gauge-wrap { width: 100%; height: 10px; background: rgba(255,82,82,0.4); border-radius: 99px; overflow: hidden; margin: 10px 0 6px 0; display: flex; border: 1px solid rgba(255,255,255,0.15); }"
+    ".gauge-wrap { width: 100%; height: 11px; background: rgba(255,82,82,0.42); border-radius: 99px; overflow: hidden; margin: 10px 0 6px 0; display: flex; border: 1px solid rgba(255,255,255,0.18); }"
     ".gauge-bull { height: 100%; background: linear-gradient(90deg, #00c853, #00e676); transition: width 0.4s ease; }"
     ".news-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 15px; margin-bottom: 9px; box-shadow: 0 3px 12px rgba(0,0,0,0.22); color: #ffffff; min-height: 115px; display: flex; flex-direction: column; justify-content: space-between; }"
     ".news-card:hover { border-color: rgba(0,229,255,0.4); }"
-    ".kpi-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; text-align: center; margin-bottom: 10px; color: #ffffff; }"
+    ".kpi-card { background: linear-gradient(145deg, #1a1e29, #12151e); border: 1px solid rgba(255,255,255,0.12); border-top: 1px solid rgba(255,255,255,0.22); border-radius: 10px; padding: 10px 14px; text-align: center; margin-bottom: 10px; color: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }"
     # 載入動畫專用 CSS
     "@keyframes pulse-ring { 0% { transform: scale(0.85); opacity: 0.9; } 50% { transform: scale(1.18); opacity: 0.35; } 100% { transform: scale(0.85); opacity: 0.9; } }"
     "@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }"
@@ -86,8 +94,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.8")
-st.caption("機構級高對比戰情版：**零裁切舒適排版 × 5大盤像素級等高對齊 × 總經與大盤多空合算評分 × 一鍵複製 AI 深度分析**")
+st.title("🎯 bd の 超級指標(∠·ω< )⌒★ 股票篩選器 V8.9")
 
 # ════════════════════════════════════════════════════════════════════════════
 # 訊號清單與預設戰術組合定義
@@ -206,6 +213,23 @@ def extract_ticker_df(data, ticker):
     except Exception:
         pass
     return pd.DataFrame()
+
+def format_tv_symbol_for_export(ticker):
+    """將股票代號轉換為 TradingView 匯入清單專用格式"""
+    t = ticker.replace("⭐ ", "").strip().upper()
+    if t == "^TWII":
+        return "TWSE:TAIEX"
+    if t.endswith(".TW"):
+        return f"TWSE:{t.replace('.TW', '')}"
+    if t.endswith(".TWO"):
+        return f"TPEX:{t.replace('.TWO', '')}"
+    if t == "BTC-USD":
+        return "BINANCE:BTCUSDT"
+    if t.endswith("-USD"):
+        return f"BINANCE:{t.replace('-USD', '')}USDT"
+    if "=F" in t:
+        return t.replace("=F", "1!")
+    return t
 
 # ════════════════════════════════════════════════════════════════════════════
 # 數據獲取與 TradingView 4H 時框精準重採樣
@@ -470,7 +494,7 @@ def run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4):
     return bi_arr, zs_arr, sg_arr
 
 # ════════════════════════════════════════════════════════════════════════════
-# 完整技術指標掃描引擎 (保留最近 600 根 K 棒確保 180 天中樞完整度)
+# 完整技術指標掃描引擎 (100% 還原 指標.txt V3.8 雙階段邏輯 + 第 07 節 SL/TP 風控計算)
 # ════════════════════════════════════════════════════════════════════════════
 def update_active_obs(src_obs, max_obs=5, show_overlap=True):
     act_obs = []
@@ -519,8 +543,9 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     if df is None or len(df) < 35:
         return None
 
-    if len(df) > 600:
-        df = df.iloc[-600:].copy()
+    # 對齊 Pine Script global_max_bars = 1000
+    if len(df) > 1000:
+        df = df.iloc[-1000:].copy()
 
     close_s, high_s, low_s, open_s = df['Close'], df['High'], df['Low'], df['Open']
     vol_s = df['Volume'] if 'Volume' in df.columns else pd.Series(0.0, index=df.index)
@@ -539,34 +564,46 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     wvf_std = wvf.rolling(20).std(ddof=0)
     wvf_ext = (wvf >= wvf_avg + 2.0 * wvf_std) | (wvf >= wvf.rolling(50).max() * 0.85)
 
-    # 2. RSI 雷達 (10 ~ 20 多週期面積引擎)
-    diff = close_s.diff().fillna(0)
-    pos_diff = diff.clip(lower=0)
-    overbuy_count = pd.Series(0.0, index=df.index)
-    oversell_count = pd.Series(0.0, index=df.index)
-    rsi_sum = pd.Series(0.0, index=df.index)
-
-    for l in range(10, 21):
-        den = rma(diff.abs(), l).replace(0, np.nan)
-        rsi_i = (100.0 * (rma(pos_diff, l) / den)).fillna(50.0)
-        rsi_sum += rsi_i
-        overbuy_count += (rsi_i > 70.0).astype(float)
-        oversell_count += (rsi_i < 30.0).astype(float)
-
+    # 2. RSI 雷達 (10 ~ 20 多週期面積引擎，完全對齊 Pine Script 遞迴 RMA)
+    rad_diff = close_s.diff().fillna(0.0).values
+    overbuy_count = np.zeros(n)
+    oversell_count = np.zeros(n)
+    avg_rsi_arr = np.zeros(n)
     N_rsi = 11.0
-    avg_rsi = rsi_sum / N_rsi
-    per_over = (overbuy_count / N_rsi) * 100.0
-    per_under = 100.0 - (oversell_count / N_rsi) * 100.0
+    rad_num = np.zeros(11)
+    rad_den = np.zeros(11)
+
+    for i in range(n):
+        d_val = rad_diff[i]
+        ob_c, os_c, r_sum = 0.0, 0.0, 0.0
+        for k_idx, l_per in enumerate(range(10, 21)):
+            alpha = 1.0 / l_per
+            rad_num[k_idx] = alpha * d_val + (1.0 - alpha) * rad_num[k_idx]
+            rad_den[k_idx] = alpha * abs(d_val) + (1.0 - alpha) * rad_den[k_idx]
+            rsi_i = (50.0 * rad_num[k_idx] / rad_den[k_idx] + 50.0) if rad_den[k_idx] != 0.0 else 50.0
+            r_sum += rsi_i
+            if rsi_i > 70.0:
+                ob_c += 1.0
+            if rsi_i < 30.0:
+                os_c += 1.0
+        overbuy_count[i] = ob_c
+        oversell_count[i] = os_c
+        avg_rsi_arr[i] = r_sum / N_rsi
+
+    avg_rsi = pd.Series(avg_rsi_arr, index=df.index)
+    overbuy_s = pd.Series(overbuy_count, index=df.index)
+    oversell_s = pd.Series(oversell_count, index=df.index)
+    per_over = (overbuy_s / N_rsi) * 100.0
+    per_under = 100.0 - (oversell_s / N_rsi) * 100.0
+
     buy_rsi_ma, sell_rsi_ma = np.zeros(n), np.zeros(n)
-    buy_rsi_ma[0], sell_rsi_ma[0] = avg_rsi.iloc[0], avg_rsi.iloc[0]
-    ob_r, os_r, avg_v = (overbuy_count / N_rsi).values, (oversell_count / N_rsi).values, avg_rsi.values
-
+    buy_rsi_ma[0], sell_rsi_ma[0] = avg_rsi_arr[0], avg_rsi_arr[0]
     for i in range(1, n):
-        buy_rsi_ma[i] = buy_rsi_ma[i - 1] + ob_r[i] * (avg_v[i] - buy_rsi_ma[i - 1])
-        sell_rsi_ma[i] = sell_rsi_ma[i - 1] + os_r[i] * (avg_v[i] - sell_rsi_ma[i - 1])
+        buy_rsi_ma[i] = buy_rsi_ma[i - 1] + (overbuy_count[i] / N_rsi) * (avg_rsi_arr[i] - buy_rsi_ma[i - 1])
+        sell_rsi_ma[i] = sell_rsi_ma[i - 1] + (oversell_count[i] / N_rsi) * (avg_rsi_arr[i] - sell_rsi_ma[i - 1])
 
-    rsi_red_below = (oversell_count > 0.0) & (per_under <= sell_rsi_ma)
-    rsi_green_above = (overbuy_count > 0.0) & (per_over >= buy_rsi_ma)
+    rsi_red_below = (oversell_s > 0.0) & (per_under <= sell_rsi_ma)
+    rsi_green_above = (overbuy_s > 0.0) & (per_over >= buy_rsi_ma)
     rsi_strong_green = rsi_green_above & (per_over >= 60.0)
 
     # 3. WaveTrend (10, 21, 4)
@@ -589,6 +626,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
 
     # 5. ATR 與 parsedHighs/Lows
     wt_atr_v = rma(tr_s, 14).values
+    atr100_v = rma(tr_s, 100).values
     atr200_v = rma(tr_s, 200).values
 
     high_vol = (high_v - low_v) >= (2.0 * atr200_v)
@@ -604,7 +642,6 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
 
     bi_arr, zs_arr, sg_arr = run_chan_engine(high_v, low_v, open_v, close_v, hist_v, min_gap=4)
     last_z = zs_arr[-1] if len(zs_arr) > 0 else None
-    zs_search_start = max(2, bi_arr[last_z['startBi']]['b0']) if (last_z is not None and len(bi_arr) > last_z['startBi']) else (n + 1)
 
     os_ext_trig, os_warn_trig, ob_warn_trig, wt_dead_trig = False, False, False, False
     last_ext_os_sl = np.nan
@@ -626,18 +663,23 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     active_int_obs, active_sw_obs = [], []
     ob_buy_events, ob_sell_events, other_events = [], [], []
 
-    curr_zs_raw = None
-    active_zs_zone = None
-    last_zs_buy_state, last_zs_sell_state = False, False
-    zs_events = []
-
     last_wt_ph_idx, last_wt_ph_val, last_wt_ph_price = -1, -float('inf'), -float('inf')
 
+    def fmt_sl_tp(is_long, entry_p, sl_p, tp_p=None):
+        sl_pct = ((sl_p - entry_p) / entry_p) * 100.0
+        dir_tag = "🟢多" if is_long else "🔴空"
+        if tp_p is not None and not np.isnan(tp_p):
+            tp_pct = ((tp_p - entry_p) / entry_p) * 100.0
+            return f"{dir_tag}｜SL:{sl_p:.2f}({sl_pct:+.1f}%) 👉 TP:{tp_p:.2f}({tp_pct:+.1f}%)"
+        return f"{dir_tag}｜SL:{sl_p:.2f}({sl_pct:+.1f}%) 👉 TP:波段續抱"
+
+    # ── 第一階段：逐根 K 棒執行 SMC 結構、OB 生成與回踩 (不讓未來的中樞提前干預歷史 OB) ──
     for i in range(2, n):
         t_str = df.index[i].strftime('%m/%d %H:%M')
         c_val = close_v[i]
         c_p = f"{c_val:.2f}"
         cur_atr = wt_atr_v[i] if not np.isnan(wt_atr_v[i]) else (high_v[i] - low_v[i])
+        cur_atr100 = atr100_v[i] if not np.isnan(atr100_v[i]) else cur_atr
 
         if i >= 5:
             h_after5 = np.max(high_v[i - 4 : i + 1])
@@ -673,7 +715,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         else:
             sw_leg[i] = sw_leg[i - 1]
 
-        # 內部結構突破
+        # 內部結構突破與產生 OB
         if not np.isnan(ih_val) and close_v[i] > ih_val and close_v[i - 1] <= ih_val and not ih_crossed and ih_val != sh_val:
             ih_crossed = True
             is_choch = (internal_trend == -1)
@@ -700,7 +742,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
                 if len(internal_obs) > 100:
                     internal_obs.pop()
 
-        # 擺動結構突破
+        # 擺動結構突破與產生 OB
         if not np.isnan(sh_val) and close_v[i] > sh_val and close_v[i - 1] <= sh_val and not sh_crossed:
             sh_crossed = True
             if show_swing_ob:
@@ -732,106 +774,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         if show_swing_ob:
             active_sw_obs, _ = update_active_obs(swing_obs, max_obs=5, show_overlap=True)
 
-        # ── 中樞延伸 OB 與 中樞×SMC 共振更新 & 嚴格回踩確認 ──
-        if last_z is not None and i >= zs_search_start:
-            if curr_zs_raw is not None and i > curr_zs_raw['break_idx']:
-                if (curr_zs_raw['bias'] == 1 and low_v[i] < curr_zs_raw['ob_lo']) or (curr_zs_raw['bias'] == -1 and high_v[i] > curr_zs_raw['ob_hi']):
-                    curr_zs_raw = None
-                    active_zs_zone = None
-                    last_zs_buy_state, last_zs_sell_state = False, False
-                    zs_events = []
-
-            if close_v[i] > last_z['ZG'] and close_v[i - 1] <= last_z['ZG']:
-                ob_idx = i - 1
-                curr_zs_raw = {
-                    'ob_hi': float(parsed_high[ob_idx]),
-                    'ob_lo': float(parsed_low[ob_idx]),
-                    'ob_idx': ob_idx,
-                    'break_idx': i,
-                    'bias': 1
-                }
-                last_zs_buy_state, last_zs_sell_state = False, False
-                zs_events = []
-            elif close_v[i] < last_z['ZD'] and close_v[i - 1] >= last_z['ZD']:
-                ob_idx = i - 1
-                curr_zs_raw = {
-                    'ob_hi': float(parsed_high[ob_idx]),
-                    'ob_lo': float(parsed_low[ob_idx]),
-                    'ob_idx': ob_idx,
-                    'break_idx': i,
-                    'bias': -1
-                }
-                last_zs_buy_state, last_zs_sell_state = False, False
-                zs_events = []
-
-            if curr_zs_raw is not None:
-                ob_hi, ob_lo, ob_idx = curr_zs_raw['ob_hi'], curr_zs_raw['ob_lo'], curr_zs_raw['ob_idx']
-                break_bias = curr_zs_raw['bias']
-                has_zs_reso = False
-                final_zs_hi, final_zs_lo = ob_hi, ob_lo
-                final_zs_bix = ob_idx
-                final_zs_gen = curr_zs_raw['break_idx']
-
-                for idx_o in range(min(5, len(internal_obs))):
-                    s_ob = internal_obs[idx_o]
-                    if s_ob['bias'] == break_bias:
-                        i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
-                        if i_top > i_bot:
-                            has_zs_reso = True
-                            final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
-                            final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
-                            final_zs_gen = max(final_zs_gen, s_ob['gen_i'])
-                            active_int_obs = [x for x in active_int_obs if x['ob_idx'] != s_ob['ob_idx']]
-
-                for x in list(active_int_obs):
-                    if x.get('is_reso', False) and x['bias'] == break_bias:
-                        if min(ob_hi, x['top']) > max(ob_lo, x['bot']):
-                            has_zs_reso = True
-                            final_zs_gen = max(final_zs_gen, x['gen_i'])
-                            active_int_obs.remove(x)
-
-                if show_swing_ob:
-                    for idx_o in range(min(5, len(swing_obs))):
-                        s_ob = swing_obs[idx_o]
-                        if s_ob['bias'] == break_bias:
-                            i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
-                            if i_top > i_bot:
-                                has_zs_reso = True
-                                final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
-                                final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
-                                final_zs_gen = max(final_zs_gen, s_ob['gen_i'])
-                                active_sw_obs = [x for x in active_sw_obs if x['ob_idx'] != s_ob['ob_idx']]
-
-                if final_zs_hi <= final_zs_lo:
-                    final_zs_hi, final_zs_lo = ob_hi, ob_lo
-
-                active_zs_zone = {
-                    'top': final_zs_hi, 'bot': final_zs_lo, 'ob_idx': final_zs_bix, 'gen_i': final_zs_gen,
-                    'bias': break_bias, 'is_reso': has_zs_reso,
-                    'type_name': ("🌟 中樞共振支撐" if break_bias == 1 else "🌟 中樞共振壓力") if has_zs_reso else ("🟠 中樞支撐" if break_bias == 1 else "🟠 中樞壓力")
-                }
-
-                if i > active_zs_zone['gen_i']:
-                    if break_bias == 1:
-                        is_touch = (low_v[i] <= final_zs_hi) or (close_v[i - 1] <= final_zs_hi and close_v[i - 1] >= final_zs_lo)
-                        is_conf = (close_v[i] > final_zs_hi)
-                        is_trend = (close_v[i] > open_v[i]) if strict_confirm else True
-                        cur_zs_b = is_touch and is_conf and is_trend
-                        if cur_zs_b and not last_zs_buy_state:
-                            tag_name = "🌟【中樞共振 Buy】" if has_zs_reso else "🟠【中樞 Buy】"
-                            zs_events.append({'bar_i': i, 'sig_str': f"{tag_name}({t_str} 守穩 {final_zs_hi:.2f})"})
-                        last_zs_buy_state = cur_zs_b
-                    else:
-                        is_touch = (high_v[i] >= final_zs_lo) or (close_v[i - 1] >= final_zs_lo and close_v[i - 1] <= final_zs_hi)
-                        is_conf = (close_v[i] < final_zs_lo)
-                        is_trend = (close_v[i] < open_v[i]) if strict_confirm else True
-                        cur_zs_s = is_touch and is_conf and is_trend
-                        if cur_zs_s and not last_zs_sell_state:
-                            tag_name = "🌟【中樞共振 Sell】" if has_zs_reso else "🟠【中樞 Sell】"
-                            zs_events.append({'bar_i': i, 'sig_str': f"{tag_name}({t_str} 受阻 {final_zs_lo:.2f})"})
-                        last_zs_sell_state = cur_zs_s
-
-        # WaveTrend 與 RSI 雷達動能訊號
+        # WaveTrend 與 RSI 雷達動能訊號 + 風控 (SL/TP)
         if wt1.iloc[i] > -60.0:
             os_ext_trig = False
             last_ext_os_sl = np.nan
@@ -863,40 +806,78 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
                 if last_wt_ph_idx != -1:
                     bars_since = (i - size_piv) - last_wt_ph_idx
                     if 5 <= bars_since <= 60 and curr_wt_ph_price > last_wt_ph_price and curr_wt_ph_val < last_wt_ph_val:
-                        other_events.append({'bar_i': i, 'sig_str': f"⚠️【頂部預警】({t_str} @ {c_p})"})
+                        sl_p = c_val + cur_atr * 1.5
+                        other_events.append({
+                            'bar_i': i,
+                            'sig_str': f"⚠️【頂部預警】({t_str} @ {c_p})",
+                            'risk_str': fmt_sl_tp(False, c_val, sl_p, None)
+                        })
                 last_wt_ph_idx = i - size_piv
                 last_wt_ph_val = curr_wt_ph_val
                 last_wt_ph_price = curr_wt_ph_price
 
         if (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i - 1] <= wt2.iloc[i - 1]) and (wt1.iloc[i - 1] <= -60.0) and wvf_ext.iloc[i - 1] and rsi_red_below.iloc[i - 1]:
-            other_events.append({'bar_i': i, 'sig_str': f"🟢【恐慌抄底】({t_str} @ {c_p})"})
+            sl_p = c_val - cur_atr * 1.5
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🟢【恐慌抄底】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(True, c_val, sl_p, c_val + cur_atr * 1.5 * 2.0)
+            })
 
         if (wt1.iloc[i] <= -60.0) and wvf_ext.iloc[i] and rsi_red_below.iloc[i]:
             if (not os_ext_trig) or (not np.isnan(last_ext_os_sl) and low_v[i] < last_ext_os_sl):
                 os_ext_trig = True
                 last_ext_os_sl = c_val - (cur_atr * 1.5)
-                other_events.append({'bar_i': i, 'sig_str': f"🟣【極度超賣】({t_str} @ {c_p})"})
+                other_events.append({
+                    'bar_i': i,
+                    'sig_str': f"🟣【極度超賣】({t_str} @ {c_p})",
+                    'risk_str': fmt_sl_tp(True, c_val, last_ext_os_sl, c_val + cur_atr * 1.5 * 2.0)
+                })
 
         wt_golden_cross_mb = (wt1.iloc[i] > wt2.iloc[i]) and (wt1.iloc[i - 1] <= wt2.iloc[i - 1])
         red_is_zero_now = (per_under.iloc[i] == 100.0)
         red_was_present = per_under.iloc[max(0, i - 3) : i].min() < 100.0
         if wt_golden_cross_mb and red_is_zero_now and red_was_present and vix_in_red_cycle and not mb_fired_in_cycle:
             mb_fired_in_cycle = True
-            other_events.append({'bar_i': i, 'sig_str': f"🟡【Market Bottom】({t_str} @ {c_p})"})
+            sl_p = c_val - cur_atr * 1.0
+            tp_p = c_val + cur_atr * 1.0 * 2.25
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🟡【Market Bottom】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(True, c_val, sl_p, tp_p)
+            })
 
         if (wt1.iloc[i] <= -53.0) and wvf_ext.iloc[i] and not os_warn_trig:
             os_warn_trig = True
-            other_events.append({'bar_i': i, 'sig_str': f"🟪【超賣預警】({t_str} @ {c_p})"})
+            sl_p = c_val - cur_atr * 1.5
+            tp_p = c_val + cur_atr * 1.5 * 1.5
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🟪【超賣預警】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(True, c_val, sl_p, tp_p)
+            })
 
         wt_dead_cross = (wt1.iloc[i] < wt2.iloc[i]) and (wt1.iloc[i - 1] >= wt2.iloc[i - 1])
         green_area_was_0 = (per_over.iloc[i] == 0.0) or (per_over.iloc[i - 1] == 0.0) or (per_over.iloc[i - 2] == 0.0)
         if wt_dead_cross and green_area_was_0 and (wt1.iloc[i - 1] > 60.0) and not wt_dead_trig:
             wt_dead_trig = True
-            other_events.append({'bar_i': i, 'sig_str': f"🟠【WT 死叉】({t_str} @ {c_p})"})
+            sl_p = c_val + cur_atr * 1.5
+            tp_p = c_val - cur_atr * 1.5 * 2.0
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🟠【WT 死叉】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(False, c_val, sl_p, tp_p)
+            })
 
         if (wt1.iloc[i] > 53.0) and not ob_warn_trig:
             ob_warn_trig = True
-            other_events.append({'bar_i': i, 'sig_str': f"🟡【超買預警】({t_str} @ {c_p})"})
+            sl_p = c_val + cur_atr * 1.5
+            tp_p = c_val - cur_atr * 1.5 * 1.5
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🟡【超買預警】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(False, c_val, sl_p, tp_p)
+            })
 
         # 反轉陷阱通道
         raw_bull_trap = False
@@ -916,19 +897,31 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         rt_abv_cnt = (rt_abv_cnt + 1) if (high_v[i] > rt_upper.iloc[i]) else 0
 
         can_fire_rt = (i - rt_last_sig) >= 10
-        if raw_bull_trap and can_fire_rt and (oversell_count.iloc[i] > 0):
+        if raw_bull_trap and can_fire_rt and (oversell_s.iloc[i] > 0):
             rt_last_sig = i
-            other_events.append({'bar_i': i, 'sig_str': f"🛡️【空頭陷阱】({t_str} @ {c_p})"})
-        if raw_bear_trap and can_fire_rt and (overbuy_count.iloc[i] > 0):
+            sl_p = min(low_v[i], low_v[i - 1]) - cur_atr100 * 1.5
+            tp_p = float(rt_basis.iloc[i])
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"🛡️【空頭陷阱】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(True, c_val, sl_p, tp_p)
+            })
+        if raw_bear_trap and can_fire_rt and (overbuy_s.iloc[i] > 0):
             rt_last_sig = i
-            other_events.append({'bar_i': i, 'sig_str': f"⚠️【多頭陷阱】({t_str} @ {c_p})"})
+            sl_p = max(high_v[i], high_v[i - 1]) + cur_atr100 * 1.5
+            tp_p = float(rt_basis.iloc[i])
+            other_events.append({
+                'bar_i': i,
+                'sig_str': f"⚠️【多頭陷阱】({t_str} @ {c_p})",
+                'risk_str': fmt_sl_tp(False, c_val, sl_p, tp_p)
+            })
 
-        # SMC OB 與 OB 共振回踩確認
+        # SMC OB 與 OB 共振回踩確認 (100% 對齊 Pine Script 第五部分 f_check_current_bar_retest)
         def check_retest_list(ob_list):
             b_trig, s_trig = False, False
             m_b_ob, m_s_ob = None, None
             for ob in ob_list:
-                if i > ob.get('gen_i', ob['ob_idx']):
+                if i > ob['ob_idx']:
                     top, bot = ob['top'], ob['bot']
                     if ob['bias'] == 1:
                         is_touch = (low_v[i] <= top) or (close_v[i - 1] <= top and close_v[i - 1] >= bot)
@@ -965,13 +958,139 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         last_buy_state = final_b
         last_sell_state = final_s
 
+        ob_buf = cur_atr * 0.05
         if fire_buy and match_b_ob is not None:
+            sl_p = match_b_ob['bot'] - ob_buf
+            risk = max(c_val - sl_p, c_val * 0.001)
+            tp_p = c_val + risk * 2.0
             sig_txt = f"🟪【OB共振支撐】({t_str} 守穩 {match_b_ob['top']:.2f})" if match_b_ob.get('is_reso') else f"🟩【OB支撐確認】({t_str} 守穩 {match_b_ob['top']:.2f})"
-            ob_buy_events.append({'bar_i': i, 'sig_str': sig_txt, 'parent_ob_idx': match_b_ob['ob_idx']})
+            ob_buy_events.append({
+                'bar_i': i,
+                'sig_str': sig_txt,
+                'risk_str': fmt_sl_tp(True, c_val, sl_p, tp_p),
+                'parent_ob_idx': match_b_ob['ob_idx']
+            })
 
         if fire_sell and match_s_ob is not None:
+            sl_p = match_s_ob['top'] + ob_buf
+            risk = max(sl_p - c_val, c_val * 0.001)
+            tp_p = c_val - risk * 2.0
             sig_txt = f"🟪【OB共振壓力】({t_str} 受阻 {match_s_ob['bot']:.2f})" if match_s_ob.get('is_reso') else f"🟥【OB壓力確認】({t_str} 受阻 {match_s_ob['bot']:.2f})"
-            ob_sell_events.append({'bar_i': i, 'sig_str': sig_txt, 'parent_ob_idx': match_s_ob['ob_idx']})
+            ob_sell_events.append({
+                'bar_i': i,
+                'sig_str': sig_txt,
+                'risk_str': fmt_sl_tp(False, c_val, sl_p, tp_p),
+                'parent_ob_idx': match_s_ob['ob_idx']
+            })
+
+    # ── 第二階段：模擬 barstate.islast 處理「最近一個纏論中樞延伸 OB 與共振」 ──
+    active_zs_zone = None
+    zs_events = []
+
+    if last_z is not None and len(bi_arr) > last_z['startBi']:
+        search_start = max(1, bi_arr[last_z['startBi']]['b0'])
+        break_idx = -1
+        break_bias = 0
+        for k in range(search_start, n):
+            if close_v[k] > last_z['ZG'] and close_v[k - 1] <= last_z['ZG']:
+                break_idx, break_bias = k, 1
+            elif close_v[k] < last_z['ZD'] and close_v[k - 1] >= last_z['ZD']:
+                break_idx, break_bias = k, -1
+
+        if break_idx > 0:
+            ob_idx = break_idx - 1
+            ob_hi = float(parsed_high[ob_idx])
+            ob_lo = float(parsed_low[ob_idx])
+
+            mitigated = False
+            for m in range(break_idx + 1, n):
+                if break_bias == 1 and low_v[m] < ob_lo:
+                    mitigated = True
+                    break
+                if break_bias == -1 and high_v[m] > ob_hi:
+                    mitigated = True
+                    break
+
+            if not mitigated:
+                has_zs_reso = False
+                final_zs_hi, final_zs_lo = ob_hi, ob_lo
+                final_zs_bix = ob_idx
+
+                for idx_o in range(min(5, len(internal_obs))):
+                    s_ob = internal_obs[idx_o]
+                    if s_ob['bias'] == break_bias:
+                        i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
+                        if i_top > i_bot:
+                            has_zs_reso = True
+                            final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
+                            final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
+                            active_int_obs = [x for x in active_int_obs if x['ob_idx'] != s_ob['ob_idx']]
+
+                for x in list(active_int_obs):
+                    if x.get('is_reso', False) and x['bias'] == break_bias:
+                        if min(ob_hi, x['top']) > max(ob_lo, x['bot']):
+                            has_zs_reso = True
+                            active_int_obs.remove(x)
+
+                if show_swing_ob:
+                    for idx_o in range(min(5, len(swing_obs))):
+                        s_ob = swing_obs[idx_o]
+                        if s_ob['bias'] == break_bias:
+                            i_top, i_bot = min(ob_hi, s_ob['top']), max(ob_lo, s_ob['bot'])
+                            if i_top > i_bot:
+                                has_zs_reso = True
+                                final_zs_hi, final_zs_lo = min(final_zs_hi, i_top), max(final_zs_lo, i_bot)
+                                final_zs_bix = max(final_zs_bix, s_ob['ob_idx'])
+                                active_sw_obs = [x for x in active_sw_obs if x['ob_idx'] != s_ob['ob_idx']]
+
+                if final_zs_hi <= final_zs_lo:
+                    final_zs_hi, final_zs_lo = ob_hi, ob_lo
+
+                active_zs_zone = {
+                    'top': final_zs_hi, 'bot': final_zs_lo, 'ob_idx': final_zs_bix,
+                    'bias': break_bias, 'is_reso': has_zs_reso,
+                    'type_name': ("🌟 中樞共振支撐" if break_bias == 1 else "🌟 中樞共振壓力") if has_zs_reso else ("🟠 中樞支撐" if break_bias == 1 else "🟠 中樞壓力")
+                }
+
+                scan_start = max(break_idx + 1, final_zs_bix + 1)
+                prev_zs_sig = False
+                for m in range(scan_start, n):
+                    t_m_str = df.index[m].strftime('%m/%d %H:%M')
+                    m_cl = close_v[m]
+                    m_atr = wt_atr_v[m] if not np.isnan(wt_atr_v[m]) else (high_v[m] - low_v[m])
+                    ob_buf_m = m_atr * 0.05
+                    if break_bias == 1:
+                        is_touch = (low_v[m] <= final_zs_hi) or (close_v[m - 1] <= final_zs_hi and close_v[m - 1] >= final_zs_lo)
+                        is_conf = (m_cl > final_zs_hi)
+                        is_trend = (m_cl > open_v[m]) if strict_confirm else True
+                        cur_sig = is_touch and is_conf and is_trend
+                        if cur_sig and not prev_zs_sig:
+                            sl_p = final_zs_lo - ob_buf_m
+                            risk = max(m_cl - sl_p, m_cl * 0.001)
+                            tp_p = m_cl + risk * 2.0
+                            tag_name = "🌟【中樞共振 Buy】" if has_zs_reso else "🟠【中樞 Buy】"
+                            zs_events.append({
+                                'bar_i': m,
+                                'sig_str': f"{tag_name}({t_m_str} 守穩 {final_zs_hi:.2f})",
+                                'risk_str': fmt_sl_tp(True, m_cl, sl_p, tp_p)
+                            })
+                        prev_zs_sig = cur_sig
+                    else:
+                        is_touch = (high_v[m] >= final_zs_lo) or (close_v[m - 1] >= final_zs_lo and close_v[m - 1] <= final_zs_hi)
+                        is_conf = (m_cl < final_zs_lo)
+                        is_trend = (m_cl < open_v[m]) if strict_confirm else True
+                        cur_sig = is_touch and is_conf and is_trend
+                        if cur_sig and not prev_zs_sig:
+                            sl_p = final_zs_hi + ob_buf_m
+                            risk = max(sl_p - m_cl, m_cl * 0.001)
+                            tp_p = m_cl - risk * 2.0
+                            tag_name = "🌟【中樞共振 Sell】" if has_zs_reso else "🟠【中樞 Sell】"
+                            zs_events.append({
+                                'bar_i': m,
+                                'sig_str': f"{tag_name}({t_m_str} 受阻 {final_zs_lo:.2f})",
+                                'risk_str': fmt_sl_tp(False, m_cl, sl_p, tp_p)
+                            })
+                        prev_zs_sig = cur_sig
 
     # 8. 垃圾回收：僅保留當前仍存活的有效 SMC OB / 共振回踩標籤
     valid_ob_indices = {ob['ob_idx'] for ob in active_int_obs} | {ob['ob_idx'] for ob in active_sw_obs}
@@ -983,14 +1102,16 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     recent_events.sort(key=lambda x: x['bar_i'])
 
     latest_signals = []
+    latest_risk_str = "無觸發訊號"
     for ev in recent_events:
         if ev['sig_str'] not in latest_signals:
             latest_signals.append(ev['sig_str'])
+        if ev.get('risk_str'):
+            latest_risk_str = ev['risk_str']
 
     last_close = float(close_v[-1])
     prev_close = float(close_v[-2]) if n >= 2 else last_close
     try:
-        # 自動尋找「前一個交易日」最後一根 K 棒的收盤價，確保 15m/1h/4h 都能顯示真實當日漲跌幅！
         idx_dates = pd.to_datetime(df.index).date
         last_date = idx_dates[-1]
         prev_day_indices = np.where(idx_dates < last_date)[0]
@@ -1061,7 +1182,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     else:
         rsi_status = "⚪ 中性整理"
 
-    # 10. 最近支撐與壓力區間
+    # 10. 最近支撐與壓力區間 + 預設結構風控價位
     all_zones = []
     if active_zs_zone is not None:
         all_zones.append(active_zs_zone)
@@ -1073,12 +1194,17 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
     bull_zones = [z for z in all_zones if z['bias'] == 1]
     bear_zones = [z for z in all_zones if z['bias'] == -1]
 
+    last_atr = wt_atr_v[-1] if not np.isnan(wt_atr_v[-1]) else (high_v[-1] - low_v[-1])
     if bull_zones:
         bull_zones.sort(key=lambda z: abs(last_close - z['top']))
         bz = bull_zones[0]
         dist = ((last_close - bz['top']) / last_close) * 100.0
         in_z = " (⚡踩入!)" if (bz['bot'] <= last_close <= bz['top']) else f" ({dist:+.1f}%)"
         nearest_sup_str = f"{bz['type_name']} [{bz['bot']:.2f}~{bz['top']:.2f}]{in_z}"
+        if latest_risk_str == "無觸發訊號":
+            sl_z = bz['bot'] - last_atr * 0.05
+            risk_z = max(last_close - sl_z, last_close * 0.002)
+            latest_risk_str = fmt_sl_tp(True, last_close, sl_z, last_close + risk_z * 2.0)
 
     if bear_zones:
         bear_zones.sort(key=lambda z: abs(z['bot'] - last_close))
@@ -1088,6 +1214,7 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         nearest_res_str = f"{rz['type_name']} [{rz['bot']:.2f}~{rz['top']:.2f}]{in_z}"
 
     k2_events = list(dict.fromkeys([ev['sig_str'] for ev in all_valid_events if ev['bar_i'] >= n - 2]))
+    sparkline_20 = [round(float(x), 2) for x in close_v[-20:]]
 
     return {
         "最新收盤價": last_close,
@@ -1104,10 +1231,13 @@ def scan_signals(df, recent_k=2, strict_confirm=False, show_swing_ob=False):
         "Chan_Cls": last_bs_cls,
         "K2_Signals": k2_events,
         "觸發指標通知": " ｜ ".join(latest_signals) if latest_signals else "",
+        "實戰風控": latest_risk_str,
         "最近支撐區": nearest_sup_str,
         "最近壓力區": nearest_res_str,
         "SMC_Trend": internal_trend,
-        "SMC_Tag": last_smc_tag
+        "SMC_Tag": last_smc_tag,
+        "Sparkline": sparkline_20,
+        "Recent_Events_Full": recent_events
     }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1197,7 +1327,6 @@ def translate_and_summarize_news(title):
 
 
 def parse_fred_csv_text(raw_text):
-    """將抓回來的 CSV 字串安全解析為 DataFrame"""
     if not raw_text or len(raw_text) < 20 or "<html" in raw_text[:120].lower():
         return pd.DataFrame()
     try:
@@ -1215,7 +1344,6 @@ def parse_fred_csv_text(raw_text):
 
 
 def fetch_single_fred_fast(sid):
-    """4 通道防封鎖 FRED 抓取器"""
     start_dt = (datetime.date.today() - datetime.timedelta(days=420)).strftime('%Y-%m-%d')
     target_url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start_dt}"
     encoded_url = urllib.parse.quote(target_url, safe='')
@@ -1260,7 +1388,6 @@ def fetch_single_fred_fast(sid):
 
 
 def extract_live_macro_from_news(raw_news_list):
-    """智慧新聞數據自動校準引擎"""
     overrides = {}
     for _, title, _ in raw_news_list:
         t_low = title.lower()
@@ -1280,7 +1407,6 @@ def extract_live_macro_from_news(raw_news_list):
 
 
 def build_8_macro_cards(fred_dict, yf_rates=None, news_overrides=None):
-    """組裝完整 8 大總經指標卡片 (標題精簡防擠壓，時間資訊整合至下方)"""
     if news_overrides is None:
         news_overrides = {}
 
@@ -1530,12 +1656,11 @@ def build_8_macro_cards(fred_dict, yf_rates=None, news_overrides=None):
 
 def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confirm, show_swing_ob):
     """非阻塞多執行緒 + 防互鎖保護 + 0.2秒即時跳動碼錶引擎"""
-    cache_key = f"intel_v88_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
+    cache_key = f"intel_v89_{selected_tf}_{scan_days}_{strict_confirm}_{show_swing_ob}"
     if "intel_mem_cache" not in st.session_state:
         st.session_state.intel_mem_cache = {}
 
     cached_item = st.session_state.intel_mem_cache.get(cache_key)
-    # 確保大盤 baro_results 至少有成功抓到資料才使用快取，避免空結果被鎖死
     if (cached_item and (time.time() - cached_item["ts"] < 900)
         and len(cached_item["data"].get("macro_cards", [])) >= 8
         and any(cached_item["data"].get("baro_results", {}).values())):
@@ -1553,7 +1678,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     def task_cross_market():
         cross_tickers = ["^VIX", "^TNX", "^FVX", "^IRX", "DX-Y.NYB", "CL=F", "GC=F"]
         try:
-            # 關閉 threads=False 防止與大盤下載搶奪 yfinance SQLite 鎖
             return yf.download(cross_tickers, period="5d", interval="1d", group_by='ticker', progress=False, threads=False)
         except Exception:
             return None
@@ -1588,7 +1712,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         fetch_interval = "1h" if selected_tf == "4h" else selected_tf
         fast_days = min(int(scan_days), 59) if selected_tf == "15m" else int(scan_days)
         try:
-            # 錯開 0.35 秒啟動並設為 threads=False，確保 100% 避開 SQLite 鎖死
             time.sleep(0.35)
             return yf.download(barometer_tickers, period=f"{fast_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=False)
         except Exception:
@@ -1628,7 +1751,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
             sub_detail=f"FRED 代理穿透 ({fred_done_cnt}/10) ｜ 跨市場資金 ({'✅' if c_done else '⏳'}) ｜ 財經新聞 ({'✅' if n_done else '⏳'}) ｜ 5大盤K線 ({'✅' if b_done else '⏳'})"
         )
 
-        # 給大盤 K 線充足的下載時間（上限 15 秒），只要大盤與跨市場完成即可放行
         if (done_tasks >= total_tasks) or (el >= 4.0 and b_done and c_done) or (el >= 15.0):
             break
 
@@ -1668,7 +1790,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     executor.shutdown(wait=False)
 
-    # 解析跨市場即時資金與備援利差
     market_cards = []
     yf_rates = {}
     extra_bull, extra_bear = 0.0, 0.0
@@ -1809,7 +1930,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     for b_tick in barometer_tickers:
         try:
             df_b = extract_ticker_df(b_data, b_tick)
-            # 若批次下載漏掉單一指數，自動進行單檔補抓保底
             if len(df_b) <= 35:
                 single_d = yf.download(b_tick, period=f"{fast_days}d", interval=fetch_interval, progress=False, threads=False)
                 df_b = extract_ticker_df(single_d, b_tick)
@@ -1823,7 +1943,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
 
     hud_box.empty()
 
-    # ── 嚴格計算大盤技術結構得分，並正式納入「全局多空總評分與能量條」 ──
     tech_bull_cnt, tech_bear_cnt = 0, 0
     tech_bull_pts, tech_bear_pts = 0.0, 0.0
     k2_dip_indices, k2_top_indices = [], []
@@ -1862,7 +1981,6 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     total_net = bull_score - bear_score
     bear_ratio_pct = int(round((bear_score / max(0.1, bull_score + bear_score)) * 100))
 
-    # ── 精準分級決策：只要大盤 >= 3 空，嚴禁判定為「右側低接」，強制以防守對沖為主 ──
     if tech_bear_cnt >= 3 and len(k2_dip_indices) == 1:
         dip_str = ", ".join(k2_dip_indices)
         tactical_mode = f"⚠️ 【主倉位防守對沖 (Hedge) ／ 僅限 {dip_str} 極小倉逆勢搶短】"
@@ -1919,6 +2037,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
         )
 
     result_dict = {
+        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "macro_cards": macro_cards,
         "market_cards": market_cards,
         "news_items": news_items[:8],
@@ -1942,7 +2061,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     return result_dict
 
 # ════════════════════════════════════════════════════════════════════════════
-# 網頁側邊欄設定 (全寬上下對齊排版)
+# 網頁側邊欄設定
 # ════════════════════════════════════════════════════════════════════════════
 user_config = load_config()
 
@@ -2072,7 +2191,19 @@ with col_b2:
 auto_intel = get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confirm, show_swing_ob)
 
 if auto_intel:
-    # ── 頂部核心：宏觀經濟 × 大盤結構 綜合戰術指揮中心 (含動態多空能量條) ──
+    # 頂部戰情狀態列
+    upd_time = auto_intel.get("updated_at", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    st.markdown(
+        f'<div class="top-status-bar">'
+        f'<span>🚀 <b>系統核心版本：</b>對齊 Pine Script V3.8 雙階段 SMC × 纏論中樞引擎 ＋ ATR 風控止損止盈</span>'
+        f'<span>'
+        f'<span class="status-pill" style="margin-right:6px;">⏳ 時框: {selected_tf_label}</span>'
+        f'<span class="status-pill" style="margin-right:6px;">📅 回溯: {scan_days}天 / 近{recent_k}K</span>'
+        f'<span class="status-pill">🕒 戰情更新: {upd_time}</span>'
+        f'</span></div>',
+        unsafe_allow_html=True
+    )
+
     st.subheader("🧭 宏觀經濟 × 大盤結構：全局戰術決策中心")
 
     t_cls = auto_intel["tactical_cls"]
@@ -2109,7 +2240,6 @@ if auto_intel:
     )
     st.markdown(strat_html, unsafe_allow_html=True)
 
-    # ── 分頁收納設計：讓版面清爽不冗長 ──
     tab_quick, tab_fred, tab_news = st.tabs([
         "💹 跨市場即時資金 & 核心總經速覽",
         f"🏛️ 聯準會 FRED 完整 8 大總經數據庫 ({len(auto_intel['macro_cards'])}項)",
@@ -2199,7 +2329,7 @@ if auto_intel:
         else:
             st.info("暫無即時新聞資料。")
 
-    # ── 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 (5 張卡片像素級等高對齊 + 雙行舒適槽位) ──
+    # ── 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ──
     st.subheader(f"🚥 大盤 24 態結構風向標 × 近 2K 閃電抄底雷達 ({selected_tf_label})")
 
     baro_results = auto_intel["baro_results"]
@@ -2348,6 +2478,7 @@ if auto_intel:
                     st.caption(f"📊 **動能狀態：** {mom_14k_str} ｜ RSI：{b_res['RSI狀態']}")
                     st.caption(f"🛡️ **最近支撐：** {sup_raw}")
                     st.caption(f"🚧 **最近壓力：** {res_raw}")
+                    st.caption(f"🎯 **結構風控：** {b_res.get('實戰風控', '無')}")
                     if k2_sigs:
                         st.caption("⚡ **近 2K 觸發：** " + " ｜ ".join(k2_sigs))
                     st.markdown("<hr style='margin:4px 0;border-color:rgba(255,255,255,0.1);'>", unsafe_allow_html=True)
@@ -2365,7 +2496,7 @@ if auto_intel:
 st.markdown("---")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 第二部分：點擊按鈕後批量掃描個股清單 (非阻塞 0.2 秒即時跳動碼錶 + 極速批次運算)
+# 第二部分：點擊按鈕後批量掃描個股清單
 # ════════════════════════════════════════════════════════════════════════════
 if scan_btn:
     favorites = [t.strip().upper() for t in fav_input.split(",") if t.strip()]
@@ -2462,28 +2593,28 @@ if scan_btn:
                             except Exception:
                                 pass_fund = False
 
-                        smc_str = f"🟢 多頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == 1 else (
-                            f"🔴 空頭 {res_tech['SMC_Tag']}" if res_tech["SMC_Trend"] == -1 else "⚪ 震盪整理"
-                        )
-
                         cur_vol = float(res_tech["當前成交量"])
                         all_scanned_rows.append({
                             "Raw_Ticker": t,
                             "Is_Fav": t in favorites,
                             "標的代號": f"⭐ {t}" if (t in favorites) else t,
                             "TV圖表": get_tv_link(t),
-                            "SMC 結構": smc_str,
+                            "24態結構": f"【{res_tech['SMC_Tag_UI']}+{res_tech['Chan_Tag']}】",
                             "最新收盤價": f"{res_tech['最新收盤價']:.2f} ({res_tech['漲跌幅']:+.2f}%)",
+                            "近20K走勢": res_tech["Sparkline"],
+                            "WT / RSI": f"WT {res_tech['WT快線']:.1f}｜RSI {res_tech['平均RSI']:.1f}",
                             "當前成交量": cur_vol,
                             "日均交易量": avg_vol,
                             "All_Signals": res_tech["觸發指標通知"],
+                            "實戰風控 (SL / TP)": res_tech["實戰風控"],
                             "最近支撐區": res_tech["最近支撐區"],
                             "最近壓力區": res_tech["最近壓力區"],
                             "PEG (市賺率)": f"{peg_val:.2f}" if peg_val > 0 else "N/A",
                             "P/E": f"{pe_val:.2f}" if pe_val > 0 else "N/A",
                             "P/B": f"{pb_val:.2f}" if pb_val > 0 else "N/A",
                             "Pass_Tech": pass_tech,
-                            "Pass_Fund": pass_fund
+                            "Pass_Fund": pass_fund,
+                            "Recent_Events_Full": res_tech["Recent_Events_Full"]
                         })
                 except Exception:
                     continue
@@ -2502,9 +2633,9 @@ if scan_btn:
     }
 
 # ════════════════════════════════════════════════════════════════════════════
-# 個股掃描結果表格渲染區 (含 4 大戰術精選 KPI 看板 + 支撐壓力同表顯示)
+# 個股掃描結果表格渲染區 (含 4 大戰術 KPI + 迷你走勢圖 + SL/TP 風控 + TV 清單匯出)
 # ════════════════════════════════════════════════════════════════════════════
-st.subheader("📋 個股訊號掃描清單")
+st.subheader("📋 個股訊號掃描清單 & 實戰風控雷達")
 
 filtered_rows = []
 if "scan_cache" in st.session_state:
@@ -2538,6 +2669,11 @@ if "scan_cache" in st.session_state:
             matched_sigs = [s for s in sigs if any(target in s for target in target_signals)]
             if matched_sigs:
                 row_copy["觸發指標通知"] = " ｜ ".join(matched_sigs)
+                # 同步找到對應過濾後訊號的最新風控價位
+                for ev in reversed(r.get("Recent_Events_Full", [])):
+                    if any(target in ev['sig_str'] for target in target_signals) and ev.get('risk_str'):
+                        row_copy["實戰風控 (SL / TP)"] = ev['risk_str']
+                        break
                 filtered_rows.append(row_copy)
 
     if cache["failed_tickers"]:
@@ -2559,31 +2695,55 @@ if "scan_cache" in st.session_state:
 
         k_col1, k_col2, k_col3, k_col4 = st.columns(4)
         with k_col1:
-            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🌟 頂級共振回踩買點</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(reso_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(reso_buy_list[:4]) if reso_buy_list else "無"}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🌟 頂級共振回踩買點</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(reso_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(reso_buy_list[:5]) if reso_buy_list else "無"}</div></div>', unsafe_allow_html=True)
         with k_col2:
-            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🟢 左側恐慌/超賣抄底</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(dip_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(dip_buy_list[:4]) if dip_buy_list else "無"}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🟢 左側恐慌/超賣抄底</div><div style="font-size:1.35rem;font-weight:900;color:#00e676;">{len(dip_buy_list)} 檔</div><div style="font-size:0.72rem;color:#00e5ff;">{", ".join(dip_buy_list[:5]) if dip_buy_list else "無"}</div></div>', unsafe_allow_html=True)
         with k_col3:
-            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">⚡ 現價正踩入支撐區</div><div style="font-size:1.35rem;font-weight:900;color:#ffca28;">{len(in_sup_list)} 檔</div><div style="font-size:0.72rem;color:#ffd600;">{", ".join(in_sup_list[:4]) if in_sup_list else "無"}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">⚡ 現價正踩入支撐區</div><div style="font-size:1.35rem;font-weight:900;color:#ffca28;">{len(in_sup_list)} 檔</div><div style="font-size:0.72rem;color:#ffd600;">{", ".join(in_sup_list[:5]) if in_sup_list else "無"}</div></div>', unsafe_allow_html=True)
         with k_col4:
-            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🔴 壓力受阻/逃頂警訊</div><div style="font-size:1.35rem;font-weight:900;color:#ff5252;">{len(bear_warn_list)} 檔</div><div style="font-size:0.72rem;color:#ff8a80;">{", ".join(bear_warn_list[:4]) if bear_warn_list else "無"}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div style="font-size:0.78rem;color:#b0b8c8;">🔴 壓力受阻/逃頂警訊</div><div style="font-size:1.35rem;font-weight:900;color:#ff5252;">{len(bear_warn_list)} 檔</div><div style="font-size:0.72rem;color:#ff8a80;">{", ".join(bear_warn_list[:5]) if bear_warn_list else "無"}</div></div>', unsafe_allow_html=True)
 
-        cols_to_show = ["標的代號", "TV圖表", "SMC 結構", "最新收盤價", "當前成交量", "日均交易量"]
+        # ── 頂部工具列：成功訊息 + TradingView 觀察清單匯出 & CSV 下載 ──
+        tb_c1, tb_c2, tb_c3 = st.columns([2.4, 1, 1])
+        with tb_c1:
+            st.success(f"🎯 個股掃描完成！共發現 **{len(df_report)}** 檔符合條件的標的 ｜ 已依 **{vol_sort_by}** 排序 (耗時: {cache['elapsed']}s)")
+        with tb_c2:
+            tv_watchlist_str = ",\n".join([format_tv_symbol_for_export(t) for t in df_report["Raw_Ticker"].tolist()])
+            st.download_button(
+                label="📥 匯出 TradingView 觀察清單 (.txt)",
+                data=tv_watchlist_str,
+                file_name=f"TV_Watchlist_{selected_tf}_{datetime.date.today()}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+        with tb_c3:
+            csv_export_cols = ["標的代號", "24態結構", "最新收盤價", "WT / RSI", "日均交易量", "觸發指標通知", "實戰風控 (SL / TP)", "最近支撐區", "最近壓力區"]
+            csv_bytes = df_report[csv_export_cols].to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📊 下載完整戰情 CSV 報表",
+                data=csv_bytes,
+                file_name=f"Scanner_Report_{selected_tf}_{datetime.date.today()}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+        cols_to_show = ["標的代號", "TV圖表", "24態結構", "最新收盤價", "近20K走勢", "WT / RSI", "日均交易量"]
         if use_fund:
             cols_to_show.extend(["PEG (市賺率)", "P/E", "P/B"])
-        cols_to_show.extend(["觸發指標通知", "最近支撐區", "最近壓力區"])
-
-        st.success(f"🎯 個股掃描完成！共發現 **{len(df_report)}** 檔符合條件的標的 ｜ 已依 **{vol_sort_by}** 由大到小排序 (耗時: {cache['elapsed']} 秒)")
+        cols_to_show.extend(["觸發指標通知", "實戰風控 (SL / TP)", "最近支撐區", "最近壓力區"])
 
         st.dataframe(
             df_report[cols_to_show],
             column_config={
                 "TV圖表": st.column_config.LinkColumn("TV看圖", display_text="🔗 開圖", width="small"),
                 "標的代號": st.column_config.TextColumn("標的代號", width="small"),
-                "SMC 結構": st.column_config.TextColumn("SMC 結構", width="small"),
-                "最新收盤價": st.column_config.TextColumn("最新收盤價 (漲跌)", width="medium"),
-                "當前成交量": st.column_config.NumberColumn("當前成交量", format="compact", width="small"),
+                "24態結構": st.column_config.TextColumn("24態結構", width="small"),
+                "最新收盤價": st.column_config.TextColumn("最新收盤價 (日漲跌)", width="medium"),
+                "近20K走勢": st.column_config.LineChartColumn("近20K走勢", width="small"),
+                "WT / RSI": st.column_config.TextColumn("WT / RSI 動能", width="medium"),
                 "日均交易量": st.column_config.NumberColumn("日均交易量", format="compact", width="small"),
                 "觸發指標通知": st.column_config.TextColumn("觸發指標通知 (近 N 根 K 棒)", width="large"),
+                "實戰風控 (SL / TP)": st.column_config.TextColumn("🎯 實戰風控 (止損 SL / 止盈 TP)", width="medium"),
                 "最近支撐區": st.column_config.TextColumn("最近支撐區 (距離%)", width="medium"),
                 "最近壓力區": st.column_config.TextColumn("最近壓力區 (距離%)", width="medium"),
             },
@@ -2597,12 +2757,24 @@ else:
     st.info("👆 上方 **宏觀經濟與大盤 24 態** 已自動完成診斷！若要篩選個股清單，請點擊左側 **「🚀 掃描個股清單」**，詳細指標洽作者bdX。")
 
 # ════════════════════════════════════════════════════════════════════════════
-# 🤖 第三部分：一鍵複製爬蟲資訊請 AI 專業分析 (Prompt 自動打包 + 一鍵剪貼簿)
+# 🤖 第三部分：一鍵複製爬蟲資訊請 AI 專業分析 (支援 4 大實戰分析風格切換 + 全寬上下切齊)
 # ════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 st.subheader("🤖 一鍵複製戰情數據請 AI 專業分析")
 
-def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows):
+ai_focus_mode = st.radio(
+    "🎯 選擇 AI 專業分析切入視角（切換後直接點擊下方按鈕複製）：",
+    [
+        "1. 🏛️ 機構全局綜合戰略（總經 + 大盤點位 + Top 3 多空狙擊 + 資金對沖）",
+        "2. ⚡ 左側恐慌抄底與槓桿 ETF 狙擊（專攻 00631L / QLD / SOXL / 2330 破底翻與極度超賣）",
+        "3. 💎 右側 SMC × 纏論中樞共振波段（專攻 OB 支撐回踩守穩、三買/二買與盈虧比風控）",
+        "4. 🛡️ 空頭避險與持股防禦健檢（專攻逃頂警訊、誘多識別、SQQQ/台指空單對沖比例）"
+    ],
+    index=0,
+    horizontal=True
+)
+
+def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows, focus_mode):
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     clean_html = lambda txt: re.sub(r'<[^>]+>', '', str(txt)) if txt else ""
     
@@ -2651,6 +2823,7 @@ def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows):
                         f"結構：【{b_res['SMC_Tag_UI']} + {b_res['Chan_Tag']}】({b_res['Chan_Action_Base']})｜"
                         f"WT快線：{b_res['WT快線']:.1f}｜平均RSI：{b_res['平均RSI']:.1f} ({b_res['RSI狀態']})｜"
                         f"最近支撐：{b_res['最近支撐區']}｜最近壓力：{b_res['最近壓力區']}｜"
+                        f"結構風控：{b_res.get('實戰風控', '無')}｜"
                         f"近2K閃電訊號：{k2_str}｜近14K累積訊號：{sig_14k}"
                     )
             lines.append("")
@@ -2669,23 +2842,49 @@ def build_ai_analysis_prompt(intel_data, tf_lbl, rec_k, current_filtered_rows):
         for r in sorted_scan[:35]:
             fund_str = f"｜PEG:{r['PEG (市賺率)']} P/E:{r['P/E']} P/B:{r['P/B']}" if not scan_mode.startswith("1") else ""
             lines.append(
-                f"- **{r['標的代號']}**｜收盤：{r['最新收盤價']}｜SMC：{r['SMC 結構']}｜"
-                f"觸發訊號：{r['觸發指標通知']}｜支撐：{r['最近支撐區']}｜壓力：{r['最近壓力區']}{fund_str}"
+                f"- **{r['標的代號']}**｜收盤：{r['最新收盤價']}｜結構：{r['24態結構']}｜{r['WT / RSI']}｜"
+                f"觸發訊號：{r['觸發指標通知']}｜風控：{r['實戰風控 (SL / TP)']}｜"
+                f"支撐：{r['最近支撐區']}｜壓力：{r['最近壓力區']}{fund_str}"
             )
     else:
         lines.append("- （尚未執行個股清單掃描，或當前過濾條件下無符合個股，請先針對上方總經與大盤指數進行深度分析）")
 
-    lines.extend([
-        "\n---",
-        "## 🎯 請根據上述數據，依序回答我以下 4 個核心問題：",
-        "1. **【宏觀與大盤多空定調】**：綜合 CPI/PPI/非農/殖利率/VIX 與 5 大盤（QQQ, SOXX, SPY, ^TWII, BTC）的纏論中樞與 SMC 結構，目前市場處於什麼階段？是否存在「總經與技術面背離」或「空頭陷阱 / 誘多風險」？",
-        "2. **【指數關鍵點位與劇本推演】**：針對美股（QQQ/SOXX/SPY）與台股（^TWII），未來 1~3 個交易日的關鍵多空分水嶺（OB 支撐與壓力區）在哪裡？站穩或跌破該如何應對？",
-        "3. **【精選個股/ETF Top 3 實戰雷達】**：若上方有掃描出個股清單，請挑出 **最值得做多的 Top 3 標的**（右側共振回踩或左側恐慌抄底）與 **最該避開/做空的標的**，並給出具體的「進場區間、停損防守價位（跌破哪個 OB 下緣）、停利目標價（哪個壓力區）」。",
-        "4. **【資金水位與部位對沖建議】**：在當前的多空評分下，建議總資金水位控制在幾成？現貨或槓桿部位（如 00631L / QLD / SOXL）是否需要搭配反向 ETF 或期貨空單進行 Hedge 對沖？"
-    ])
+    lines.append("\n---")
+    if focus_mode.startswith("2"):
+        lines.extend([
+            "## 🎯 請以【左側恐慌抄底與槓桿 ETF 狙擊專家】視角，回答以下 4 個核心問題：",
+            "1. **【超賣極限與反彈時機判定】**：觀察 QQQ、SOXX、`^TWII` 的 WT 快線與平均 RSI（是否進入 ≤-53/-60 或 RSI<30 極度超賣區？），目前殺盤動能是否出現衰竭？距離觸發「🟢恐慌抄底 / 🟡Market Bottom / 🛡️空頭陷阱」還差什麼條件？",
+            "2. **【槓桿 ETF（00631L / QLD / SOXL）精準狙擊計畫】**：若想操作兩倍/三倍槓桿 ETF 或台積電（2330.TW / TSM）搶反彈，請給出明確的「分批進場價位區間、嚴格停損線（跌破哪個 OB 下緣必須砍倉）、第一與第二停利目標價」。",
+            "3. **【波動率耗損（Volatility Decay）與假反彈防範】**：在當前 VIX 與美債殖利率水準下，持有 SOXL / QLD / 00631L 需要注意什麼風險？如何區分「真破底翻」與「死貓跳誘多」？",
+            "4. **【左側試單倉位配置】**：建議第一筆試單資金佔總部位幾 %？加碼條件為何？"
+        ])
+    elif focus_mode.startswith("3"):
+        lines.extend([
+            "## 🎯 請以【右側 SMC × 纏論中樞共振波段交易員】視角，回答以下 4 個核心問題：",
+            "1. **【SMC 訂單塊與纏論 24 態結構拆解】**：請深度解析 5 大盤與掃描清單中，哪些標的具備最強的「🌟中樞共振支撐」或「🟪OB共振支撐」？哪些正處於「纏論二買/三買」的順勢結構？",
+            "2. **【右側高勝率波段 Top 3 精選】**：請從數據中挑出 **結構最紮實、盈虧比最佳的 Top 3 做多標的**，並列出完整的交易計畫（進場確認條件、SL 止損價位、1:2 止盈 TP 目標價）。",
+            "3. **【關鍵多空分水嶺（CHOCH / BOS 轉換位）】**：台美股大盤若要從目前的結構重新翻回「🟢綠 CHOCH / 綠 BOS 真多頭」，必須帶量站上哪個具體價位？",
+            "4. **【波段移動停利策略】**：進場後若順利脫離成本區，該如何利用 4H 內部 OB 或纏論中樞下沿（ZD）進行移動停利？"
+        ])
+    elif focus_mode.startswith("4"):
+        lines.extend([
+            "## 🎯 請以【機構風控長與空頭避險專家】視角，回答以下 4 個核心問題：",
+            "1. **【總經逆風與系統性風險壓力測試】**：結合 CPI/PPI、10Y 美債殖利率、原油與 VIX 恐慌指數，目前市場面臨的最大尾端風險（Tail Risk）是什麼？大盤下檔最悲觀可能回測哪個長線支撐區？",
+            "2. **【逃頂與做空目標鎖定】**：針對觸發「🌟中樞共振Sell / 🟪OB共振壓力 / ⚠️頂部預警 / 🟠WT死叉」或處於「🔴紅CHOCH + 一賣/二賣」的弱勢標的，哪幾檔最適合逢高減碼或順勢做空？",
+            "3. **【現貨與槓桿部位 Hedge 對沖配比】**：若手中仍持有台美股多頭部位，建議配置多少比例的反向 ETF（SQQQ / SOXS / 00632R）或台指期空單？",
+            "4. **【解除警報（對沖平倉）訊號】**：未來看到哪 3 個具體客觀指標轉好時，才可以解除空單對沖、重新放大多頭部位？"
+        ])
+    else:
+        lines.extend([
+            "## 🎯 請根據上述數據，依序回答我以下 4 個核心問題：",
+            "1. **【宏觀與大盤多空定調】**：綜合 CPI/PPI/非農/殖利率/VIX 與 5 大盤（QQQ, SOXX, SPY, ^TWII, BTC）的纏論中樞與 SMC 結構，目前市場處於什麼階段？是否存在「總經與技術面背離」或「空頭陷阱 / 誘多風險」？",
+            "2. **【指數關鍵點位與劇本推演】**：針對美股（QQQ/SOXX/SPY）與台股（^TWII），未來 1~3 個交易日的關鍵多空分水嶺（OB 支撐與壓力區）在哪裡？站穩或跌破該如何應對？",
+            "3. **【精選個股/ETF Top 3 實戰雷達】**：若上方有掃描出個股清單，請挑出 **最值得做多的 Top 3 標的**（右側共振回踩或左側恐慌抄底）與 **最該避開/做空的標的**，並給出具體的「進場區間、停損防守價位（SL）、停利目標價（TP）」。",
+            "4. **【資金水位與部位對沖建議】**：在當前的多空評分下，建議總資金水位控制在幾成？現貨或槓桿部位（如 00631L / QLD / SOXL）是否需要搭配反向 ETF 或期貨空單進行 Hedge 對沖？"
+        ])
     return "\n".join(lines)
 
-ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k, filtered_rows)
+ai_prompt_text = build_ai_analysis_prompt(auto_intel, selected_tf_label, recent_k, filtered_rows, ai_focus_mode)
 b64_prompt = json.dumps(ai_prompt_text)
 
 # 上方：100% 全寬無邊距一鍵複製按鈕（消除 iframe 預設白邊，與下方折疊盒像素級切齊）
@@ -2703,7 +2902,7 @@ components.html(
             box-shadow: 0 4px 14px rgba(0, 229, 255, 0.28);
             transition: all 0.2s ease; font-family: sans-serif;
             box-sizing: border-box;
-        ">📋 一鍵複製全部爬蟲數據 & AI 分析指令</button>
+        ">📋 一鍵複製全部爬蟲數據 & AI 分析指令 ({ai_focus_mode.split('（')[0]})</button>
     </div>
     <script>
     const btn = document.getElementById('copy-ai-btn');
@@ -2713,7 +2912,7 @@ components.html(
             btn.innerHTML = '✅ 已成功複製到剪貼簿！快去貼給 AI 吧！';
             btn.style.background = 'linear-gradient(90deg, #ffd600, #00e676)';
             setTimeout(() => {{
-                btn.innerHTML = '📋 一鍵複製全部爬蟲數據 & AI 分析指令';
+                btn.innerHTML = '📋 一鍵複製全部爬蟲數據 & AI 分析指令 ({ai_focus_mode.split('（')[0]})';
                 btn.style.background = 'linear-gradient(90deg, #00e5ff, #00e676)';
             }}, 3000);
         }}).catch(err => {{
