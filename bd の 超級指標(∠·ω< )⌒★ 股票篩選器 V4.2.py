@@ -35,35 +35,36 @@ st.set_page_config(
 st.markdown(
     "<style>"
     ".block-container { padding-top: 1.5rem; padding-bottom: 2rem; }"
-    # 基礎卡片與強制等高設定
-    ".baro-card { background: linear-gradient(145deg, #1a1e29, #10131a); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 13px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.28); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }"
+    # 基礎卡片：改為 flex-start 緊湊排列，徹底消滅中間黑洞！
+    ".baro-card { background: linear-gradient(145deg, #1a1e29, #10131a); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 13px; margin-bottom: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.28); color: #e0e3eb; transition: transform 0.18s ease, box-shadow 0.18s ease; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }"
     ".baro-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.25); }"
-    ".baro-card-eq { height: 382px !important; overflow: hidden; }"
-    ".macro-card-sm { height: 140px !important; overflow: hidden; }"
+    ".baro-card-eq { height: 348px !important; overflow: hidden; }"
+    ".macro-card-sm { height: 132px !important; justify-content: space-between !important; overflow: hidden; }"
     ".baro-bull { border-left: 5px solid #00e676; }"
     ".baro-bear { border-left: 5px solid #ff5252; }"
     ".baro-warn { border-left: 5px solid #ffca28; }"
-    # 頂部標題與價格防爆框設計
+    # 頂部標題與價格
     ".baro-title { font-size: 0.92rem; font-weight: 800; color: #ffffff; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 4px; }"
     ".ticker-wrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }"
     ".price-wrap { text-align: right; white-space: nowrap; line-height: 1.18; flex-shrink: 0; }"
     ".baro-price { font-size: 0.88rem; font-family: 'JetBrains Mono', monospace; color: #00e5ff; font-weight: 700; }"
     ".tv-mini-btn { font-size: 0.68rem; background: rgba(0,229,255,0.15); color: #00e5ff !important; padding: 1px 5px; border-radius: 4px; text-decoration: none !important; border: 1px solid rgba(0,229,255,0.35); margin-left: 5px; white-space: nowrap; }"
     ".tv-mini-btn:hover { background: rgba(0,229,255,0.32); }"
-    # 固定高度的近 2K 閃電雷達槽位 (雙行舒適排版，絕不切字)
-    ".k2-slot { height: 48px; border-radius: 6px; padding: 4px 8px; margin-bottom: 7px; font-size: 0.73rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; line-height: 1.32; overflow: hidden; box-sizing: border-box; }"
+    # 近 2K 閃電雷達槽位 (允許自然換行不切字)
+    ".k2-slot { height: 48px; border-radius: 6px; padding: 4px 8px; margin-bottom: 6px; font-size: 0.72rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; line-height: 1.28; overflow: hidden; box-sizing: border-box; }"
     ".k2-bull { background: rgba(0,230,118,0.18); border: 1px solid #00e676; color: #00e676; }"
     ".k2-bear { background: rgba(255,82,82,0.18); border: 1px solid #ff5252; color: #ff5252; }"
     ".k2-idle { background: rgba(255,255,255,0.035); border: 1px dashed rgba(255,255,255,0.15); color: #788296; font-weight: 600; }"
-    # 固定高度的 24 態標籤與劇本區
-    ".baro-badge { display: flex; flex-direction: column; justify-content: center; height: 44px; padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.2px; line-height: 1.32; box-sizing: border-box; overflow: hidden; }"
+    # 24 態標籤與劇本區 (緊湊無黑洞)
+    ".baro-badge { display: flex; flex-direction: column; justify-content: center; height: 42px; padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.2px; line-height: 1.30; box-sizing: border-box; overflow: hidden; }"
     ".badge-bull { background: rgba(0, 230, 118, 0.18); color: #00e676; border: 1px solid rgba(0,230,118,0.45); }"
     ".badge-bear { background: rgba(255, 82, 82, 0.18); color: #ff5252; border: 1px solid rgba(255,82,82,0.45); }"
     ".badge-warn { background: rgba(255, 202, 40, 0.18); color: #ffca28; border: 1px solid rgba(255,202,40,0.45); }"
     ".baro-badge-inline { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box; }"
-    ".baro-advice { font-size: 0.80rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; height: 36px; line-height: 1.32; display: flex; align-items: center; overflow: hidden; }"
-    ".baro-sub { font-size: 0.72rem; color: #b0b8c8; line-height: 1.48; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; }"
-    ".sub-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }"
+    ".baro-advice { font-size: 0.80rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; min-height: 22px; line-height: 1.30; }"
+    ".baro-sub { font-size: 0.73rem; color: #b0b8c8; line-height: 1.45; border-top: 1px solid rgba(255,255,255,0.10); padding-top: 7px; margin-top: 2px; }"
+    ".sub-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }"
+    ".zone-box { background: rgba(255,255,255,0.04); border-radius: 5px; padding: 4px 7px; margin-top: 4px; font-size: 0.71rem; line-height: 1.38; border-left: 2px solid rgba(0,229,255,0.5); }"
     ".metric-pill { background: rgba(255,214,0,0.15); border: 1px solid rgba(255,214,0,0.35); padding: 0px 5px; border-radius: 4px; font-family: monospace; color: #ffd600; font-weight: 700; }"
     ".strategy-box { background: linear-gradient(135deg, #131824, #1c2434); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); color: #ffffff; }"
     ".gauge-wrap { width: 100%; height: 10px; background: rgba(255,82,82,0.4); border-radius: 99px; overflow: hidden; margin: 10px 0 6px 0; display: flex; border: 1px solid rgba(255,255,255,0.15); }"
@@ -2276,9 +2277,18 @@ if auto_intel:
                 chg_col = "#00e676" if chg_val >= 0 else "#ff5252"
                 tv_url = get_tv_link(b_tick)
 
+                # 將支撐與壓力拆解為「名稱+距離%」與「完整價格區間」，卡片上直接顯示不變 ...
+                sup_raw = b_res["最近支撐區"]
+                res_raw = b_res["最近壓力區"]
+                sup_short = re.sub(r'\[.*?\]', '', sup_raw).strip()
+                res_short = re.sub(r'\[.*?\]', '', res_raw).strip()
+                sup_range = re.search(r'\[(.*?)\]', sup_raw)
+                res_range = re.search(r'\[(.*?)\]', res_raw)
+                sup_p_txt = f" ({sup_range.group(1)})" if sup_range else ""
+                res_p_txt = f" ({res_range.group(1)})" if res_range else ""
+
                 card_html = (
                     f'<div class="baro-card baro-card-eq baro-{style_cls}">'
-                    f'<div>'
                     f'<div class="baro-title">'
                     f'<span class="ticker-wrap">{b_tick}<a href="{tv_url}" target="_blank" class="tv-mini-btn">🔗TV</a></span>'
                     f'<span class="price-wrap"><span class="baro-price">{px_val:.2f}</span><br><span style="color:{chg_col};font-size:0.74rem;font-family:monospace;font-weight:700;">({chg_val:+.2f}%)</span></span>'
@@ -2288,24 +2298,31 @@ if auto_intel:
                     f'<div class="sub-line" style="margin:0;">【{smc_ui} + {chan_tag}】</div>'
                     f'<div class="sub-line" style="margin:0;">{tactical_tag}</div>'
                     f'</div>'
-                    f'<div class="baro-advice"><span>24態劇本：{base_advice}</span></div>'
-                    f'</div>'
+                    f'<div class="baro-advice">24態劇本：{base_advice}</div>'
                     f'<div class="baro-sub">'
-                    f'<div class="sub-line">• 14K動能: <b>{mom_14k_str}</b></div>'
-                    f'<div class="sub-line">• 指標: WT <span class="metric-pill">{wt_now:.1f}</span> ｜ RSI <span class="metric-pill">{rsi_now:.1f}</span> ({b_res["RSI狀態"]})</div>'
-                    f'<div class="sub-line" title="{b_res["最近支撐區"]}">• 支撐: {b_res["最近支撐區"]}</div>'
-                    f'<div class="sub-line" title="{b_res["最近壓力區"]}">• 壓力: {b_res["最近壓力區"]}</div>'
+                    f'<div class="sub-line">• 14K: <b style="color:#ffffff;">多 {bull_count} : 空 {bear_count}</b> ｜ WT <span class="metric-pill">{wt_now:.1f}</span> RSI <span class="metric-pill">{rsi_now:.1f}</span></div>'
+                    f'<div class="zone-box">'
+                    f'<div class="sub-line" style="margin:0;color:#80cbc4;">🛡️ 支撐: {sup_short}<span style="color:#b0b8c8;font-family:monospace;">{sup_p_txt}</span></div>'
+                    f'<div class="sub-line" style="margin:0;color:#ef9a9a;">🚧 壓力: {res_short}<span style="color:#b0b8c8;font-family:monospace;">{res_p_txt}</span></div>'
+                    f'</div>'
                     f'</div></div>'
                 )
                 st.markdown(card_html, unsafe_allow_html=True)
 
-                with st.expander("🕒 近 14K 訊號計分與時間軸"):
+                # 將原本被擠掉的延伸資訊（完整支撐壓力區間、RSI狀態、近2K與近14K明細）整齊收納進折疊面板
+                with st.expander("🔍 完整價位區間 & 14K 訊號時間軸"):
+                    st.caption(f"📊 **動能狀態：** {mom_14k_str} ｜ RSI：{b_res['RSI狀態']}")
+                    st.caption(f"🛡️ **最近支撐：** {sup_raw}")
+                    st.caption(f"🚧 **最近壓力：** {res_raw}")
+                    if k2_sigs:
+                        st.caption("⚡ **近 2K 觸發：** " + " ｜ ".join(k2_sigs))
+                    st.markdown("<hr style='margin:4px 0;border-color:rgba(255,255,255,0.1);'>", unsafe_allow_html=True)
                     if bull_detail:
-                        st.caption("🟢 **多方：** " + "、".join([f"{k}({v})" for k, v in bull_detail.items()]))
+                        st.caption("🟢 **14K多方計分：** " + "、".join([f"{k}({v})" for k, v in bull_detail.items()]))
                     if bear_detail:
-                        st.caption("🔴 **空方：** " + "、".join([f"{k}({v})" for k, v in bear_detail.items()]))
+                        st.caption("🔴 **14K空方計分：** " + "、".join([f"{k}({v})" for k, v in bear_detail.items()]))
                     if not sigs:
-                        st.caption("近 14 根 K 棒內無觸發回踩或極端動能訊號")
+                        st.caption("🕒 近 14 根 K 棒內無觸發回踩或極端動能訊號")
                     for s in sigs:
                         st.caption(f"• {s}")
             else:
