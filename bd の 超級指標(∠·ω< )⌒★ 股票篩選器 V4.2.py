@@ -118,7 +118,7 @@ def load_config():
         "scan_us_indices": False,
         "selected_tf_label": "4小時K (TV標準)",
         "recent_k": 2,
-        "scan_days": 45,
+        "scan_days": 180,
         "strict_confirm": False,
         "show_swing_ob": False,
         "vol_sort_by": "日均交易量 (推薦)",
@@ -1560,7 +1560,7 @@ def get_macro_and_barometer_with_live_timer(selected_tf, scan_days, strict_confi
     def task_barometer():
         barometer_tickers = ["QQQ", "SOXX", "SPY", "^TWII", "BTC-USD"]
         fetch_interval = "1h" if selected_tf == "4h" else selected_tf
-        fast_days = min(int(scan_days), 45) if selected_tf in ["15m", "1h", "4h"] else min(int(scan_days), 120)
+        fast_days = min(int(scan_days), 59) if selected_tf == "15m" else int(scan_days)
         try:
             return yf.download(barometer_tickers, period=f"{fast_days}d", interval=fetch_interval, group_by='ticker', progress=False, threads=True)
         except Exception:
@@ -1939,9 +1939,9 @@ col_s1, col_s2 = st.sidebar.columns(2)
 with col_s1:
     recent_k = st.number_input("掃描近 N 根K線", min_value=1, max_value=15, value=int(user_config.get("recent_k", 2)))
 with col_s2:
-    max_days = 45 if selected_tf in ["15m"] else (360 if selected_tf in ["1h", "4h"] else 500)
-    default_days = max(15, min(int(user_config.get("scan_days", 45)), max_days))
-    scan_days = st.number_input("歷史天數 (越小越快)", min_value=15, max_value=max_days, value=default_days)
+    max_days = 60 if selected_tf in ["15m"] else (730 if selected_tf in ["1h", "4h"] else 1000)
+    default_days = max(20, min(int(user_config.get("scan_days", 180)), max_days))
+    scan_days = st.number_input("歷史天數 (影響中樞完整度)", min_value=20, max_value=max_days, value=default_days)
 
 sort_opts = ["日均交易量 (推薦)", "當前K棒成交量"]
 sort_idx = 0 if user_config.get("vol_sort_by", "日均交易量 (推薦)") == "日均交易量 (推薦)" else 1
